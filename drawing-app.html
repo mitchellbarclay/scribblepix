@@ -3777,114 +3777,87 @@ function strokeJaggedRing(targetCtx, cx, cy, r, thickness, css, alpha, table){
 function doBoom(cx,cy){
   saveHistory();
   lastStrokePoints=null;
-  var baseR=200+Math.random()*120;
+  var baseR   = 190 + Math.random()*80;  // source content radius (logical px)
+  var craterR = baseR * 0.30;            // centre cleared to background
+  var sampleR = baseR * 1.32;            // outer edge of displaced ring
 
-  // === Permanent crater: one big asymmetric jagged blob + a handful of
-  // unique satellite blobs, each with its own noise seed. No repeating disc
-  // primitive — every silhouette is a one-off.
-  var coreStamp=buildJaggedBlobStamp(baseR*0.85, BG_CSS, makeNoiseSeed(), 0.42);
-  ctx.save();
-  stampDot(ctx, cx, cy, coreStamp);
-  var sats=4+Math.floor(Math.random()*4);
-  for(var i=0;i<sats;i++){
-    var ang=Math.random()*6.2832;
-    var dist=baseR*(0.35+Math.random()*0.55);
-    var sr=baseR*(0.18+Math.random()*0.32);
-    var amp=0.45+Math.random()*0.4;
-    var stamp=buildJaggedBlobStamp(sr, BG_CSS, makeNoiseSeed(), amp);
-    ctx.globalAlpha=0.55+Math.random()*0.45;
-    stampDot(ctx, cx+Math.cos(ang)*dist, cy+Math.sin(ang)*dist, stamp);
-  }
-  // Scorch rays — ragged radial gouges that run past the crater edge.
-  var rays=8+Math.floor(Math.random()*7);
-  for(var i=0;i<rays;i++){
-    var rang=Math.random()*6.2832;
-    var rstart=baseR*(0.25+Math.random()*0.35);
-    var rend=baseR*(0.85+Math.random()*0.6);
-    var rThick=Math.max(2, Math.round(2+Math.random()*5));
-    ctx.globalAlpha=0.45+Math.random()*0.45;
-    stampLine(ctx,
-      cx+Math.cos(rang)*rstart, cy+Math.sin(rang)*rstart,
-      cx+Math.cos(rang)*rend,   cy+Math.sin(rang)*rend,
-      getBrushStamp(rThick, BG_CSS));
-  }
-  ctx.globalAlpha=1;
-  ctx.restore();
+  // === Radial pixel push ===
+  // For each destination pixel at distance d from centre:
+  //   d < craterR           → background (the hole)
+  //   craterR ≤ d < sampleR → bilinear-sample source at srcD = (d-craterR)/(sampleR-craterR)*baseR
+  //   d ≥ sampleR           → unchanged
+  // Content originally within baseR gets stretched into the [craterR, sampleR] ring.
+  var grabR  = Math.ceil(sampleR);
+  var pCx    = cx * DPR,  pCy = cy * DPR;
+  var pGrab  = grabR  * DPR;
+  var pCrat  = craterR * DPR;
+  var pBlast = baseR   * DPR;
+  var pSamp  = sampleR * DPR;
 
-  // === Animated overlay: jagged shockwaves, radial streaks, chunky debris.
-  var rings=[
-    {r:0,max:baseR*1.4,col:'#ff6600',lw:8, table:buildNoiseTable(makeNoiseSeed(), 0.18)},
-    {r:0,max:baseR*2.0,col:'#ffcc00',lw:5, table:buildNoiseTable(makeNoiseSeed(), 0.24)},
-    {r:0,max:baseR*2.6,col:'#ffffff',lw:2, table:buildNoiseTable(makeNoiseSeed(), 0.30)}
-  ];
-  var streaks=[], streakCols=['#ffcc00','#ff8800','#ffffff','#ff4400','#ffee99'];
-  var streakCount=14+Math.floor(Math.random()*10);
-  for(var i=0;i<streakCount;i++){
-    streaks.push({
-      ang:Math.random()*6.2832,
-      head:6+Math.random()*30,
-      tail:30+Math.random()*70,
-      speed:14+Math.random()*22,
-      thick:1+Math.floor(Math.random()*4),
-      col:streakCols[Math.floor(Math.random()*streakCols.length)],
-      life:1,
-      decay:0.022+Math.random()*0.02
-    });
+  var bx0 = Math.max(0,           Math.floor(pCx - pGrab));
+  var by0 = Math.max(0,           Math.floor(pCy - pGrab));
+  var bx1 = Math.min(canvasW*DPR, Math.ceil (pCx + pGrab));
+  var by1 = Math.min(canvasH*DPR, Math.ceil (pCy + pGrab));
+  var bw = bx1 - bx0, bh = by1 - by0;
+
+  var snap = ctx.getImageData(bx0, by0, bw, bh);
+  var src  = snap.data;
+  var dst  = new Uint8ClampedArray(bw * bh * 4);
+  var bgR=BG[0], bgG=BG[1], bgB=BG[2];
+
+  for(var iy=0; iy<bh; iy++){
+    for(var ix=0; ix<bw; ix++){
+      var dx = (bx0+ix) - pCx,  dy = (by0+iy) - pCy;
+      var d  = Math.sqrt(dx*dx + dy*dy);
+      var di = (iy*bw+ix)*4;
+
+      if(d < pCrat){
+        dst[di]=bgR; dst[di+1]=bgG; dst[di+2]=bgB; dst[di+3]=255;
+      } else if(d >= pSamp){
+        dst[di]=src[di]; dst[di+1]=src[di+1]; dst[di+2]=src[di+2]; dst[di+3]=src[di+3];
+      } else {
+        var srcD = (d - pCrat) / (pSamp - pCrat) * pBlast;
+        var sx = pCx + (dx/d)*srcD - bx0;
+        var sy = pCy + (dy/d)*srcD - by0;
+        sx = Math.max(0, Math.min(bw-1.001, sx));
+        sy = Math.max(0, Math.min(bh-1.001, sy));
+        var xi=sx|0, yi=sy|0;
+        var fx=sx-xi, fy=sy-yi;
+        var xi1=Math.min(xi+1,bw-1), yi1=Math.min(yi+1,bh-1);
+        var i00=(yi *bw+xi )*4, i10=(yi *bw+xi1)*4;
+        var i01=(yi1*bw+xi )*4, i11=(yi1*bw+xi1)*4;
+        var w00=(1-fx)*(1-fy), w10=fx*(1-fy), w01=(1-fx)*fy, w11=fx*fy;
+        dst[di  ]=src[i00  ]*w00+src[i10  ]*w10+src[i01  ]*w01+src[i11  ]*w11;
+        dst[di+1]=src[i00+1]*w00+src[i10+1]*w10+src[i01+1]*w01+src[i11+1]*w11;
+        dst[di+2]=src[i00+2]*w00+src[i10+2]*w10+src[i01+2]*w01+src[i11+2]*w11;
+        dst[di+3]=src[i00+3]*w00+src[i10+3]*w10+src[i01+3]*w01+src[i11+3]*w11;
+      }
+    }
   }
-  // Chunky debris — mix square pixels with disc dots so shapes don't all rhyme.
-  var debris=[], debrisCols=['#ff4400','#ff8800','#ffcc00','#ffff66','#ff2200','#ffffff','#332222'];
-  for(var i=0;i<70;i++){
-    var ang=Math.random()*6.2832, spd=3+Math.random()*11;
-    debris.push({
-      x:cx, y:cy,
-      vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd-Math.random()*3.5,
-      size:2+Math.random()*7,
-      col:debrisCols[Math.floor(Math.random()*debrisCols.length)],
-      life:1,
-      decay:0.013+Math.random()*0.022,
-      shape: Math.random()<0.55 ? 'sq' : 'dot'
-    });
-  }
-  var frame=0;
+  ctx.putImageData(new ImageData(dst, bw, bh), bx0, by0);
+
+  // === Shockwave overlay: white flash + single expanding ring, then done ===
+  var wave  = {r:4, max:sampleR, speed:sampleR/16, table:buildNoiseTable(makeNoiseSeed(), 0.13)};
+  var flash = 1.0;
+  var frame = 0;
   function animBoom(){
     ovCtx.clearRect(0,0,canvasW,canvasH);
 
-    for(var ri=0;ri<rings.length;ri++){
-      var rg=rings[ri];
-      rg.r=Math.min(rg.r+11,rg.max);
-      var al=1-rg.r/rg.max;
-      strokeJaggedRing(ovCtx, cx, cy, rg.r, rg.lw*al, rg.col, al, rg.table);
+    if(flash > 0){
+      ovCtx.globalAlpha = flash * 0.5;
+      ovCtx.fillStyle = '#ffffff';
+      ovCtx.beginPath(); ovCtx.arc(cx, cy, craterR*flash, 0, 6.2832); ovCtx.fill();
+      flash -= 0.13;
     }
 
-    for(var si=0;si<streaks.length;si++){
-      var s=streaks[si];
-      if(s.life<=0) continue;
-      s.head+=s.speed; s.tail+=s.speed*0.65; s.life-=s.decay;
-      var headD=s.head, tailD=Math.max(0, s.head-s.tail);
-      ovCtx.globalAlpha=Math.max(0,s.life);
-      stampLine(ovCtx,
-        cx+Math.cos(s.ang)*tailD, cy+Math.sin(s.ang)*tailD,
-        cx+Math.cos(s.ang)*headD, cy+Math.sin(s.ang)*headD,
-        getBrushStamp(s.thick, s.col));
-    }
-    ovCtx.globalAlpha=1;
+    wave.r = Math.min(wave.r + wave.speed, wave.max);
+    var t  = wave.r / wave.max;
+    var al = Math.pow(1-t, 0.75) * 0.9;
+    var lw = Math.max(1, (1-t)*3.5);
+    if(al > 0.02) strokeJaggedRing(ovCtx, cx, cy, wave.r, Math.ceil(lw), '#ffffff', al, wave.table);
+    ovCtx.globalAlpha = 1;
 
-    for(var pi=0;pi<debris.length;pi++){
-      var p=debris[pi];
-      p.x+=p.vx; p.y+=p.vy; p.vy+=0.2; p.life-=p.decay;
-      if(p.life<=0) continue;
-      ovCtx.globalAlpha=p.life;
-      if(p.shape==='sq'){
-        var sz=Math.max(1, Math.round(p.size*p.life));
-        ovCtx.fillStyle=p.col;
-        ovCtx.fillRect(Math.round(p.x)-(sz>>1), Math.round(p.y)-(sz>>1), sz, sz);
-      } else {
-        stampDot(ovCtx, p.x, p.y, getBrushStamp(p.size*p.life*0.5, p.col));
-      }
-      ovCtx.globalAlpha=1;
-    }
-
-    if(++frame<100) requestAnimationFrame(animBoom);
+    if(++frame < 42) requestAnimationFrame(animBoom);
     else ovCtx.clearRect(0,0,canvasW,canvasH);
   }
   animBoom();

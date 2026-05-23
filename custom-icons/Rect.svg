@@ -1,0 +1,21 @@
+<svg width="78" height="78" viewBox="0 0 78 78" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- White glow outline -->
+<rect x="11" y="20" width="56" height="38" rx="3" stroke="white" stroke-width="6"/>
+<!-- Main fill -->
+<rect x="11" y="20" width="56" height="38" rx="3" fill="#E91E8C"/>
+<!-- Top highlight band -->
+<path d="M14 20 H67 V31 H11 V23 Q11 20 14 20 Z" fill="#F06BAE"/>
+<!-- Bottom shadow band -->
+<path d="M11 47 H67 V55 Q67 58 64 58 H14 Q11 58 11 55 Z" fill="#B01065"/>
+<!-- Interior stripe pattern (pattern state preview) -->
+<path d="M34 20 L41 20 L27 58 L20 58 Z" fill="rgba(255,255,255,0.13)"/>
+<path d="M50 20 L57 20 L43 58 L36 58 Z" fill="rgba(255,255,255,0.10)"/>
+<!-- Black outline -->
+<rect x="11" y="20" width="56" height="38" rx="3" stroke="black" stroke-width="3"/>
+<!-- Anchor corner dot (top-left) -->
+<circle cx="11" cy="20" r="5.5" fill="white" stroke="black" stroke-width="2.5"/>
+<circle cx="11" cy="20" r="2.5" fill="#E91E8C"/>
+<!-- Diagonal corner dot (bottom-right) -->
+<circle cx="67" cy="58" r="5.5" fill="white" stroke="black" stroke-width="2.5"/>
+<circle cx="67" cy="58" r="2.5" fill="#E91E8C"/>
+</svg>

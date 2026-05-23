@@ -1,0 +1,14 @@
+<svg width="78" height="78" viewBox="0 0 78 78" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- White glow -->
+<rect x="11" y="20" width="56" height="38" rx="5" stroke="white" stroke-width="9"/>
+<!-- Pink thick border stroke (outline mode = no fill) -->
+<rect x="11" y="20" width="56" height="38" rx="5" stroke="#E91E8C" stroke-width="9"/>
+<!-- White inner fill to show the hollow center -->
+<rect x="16" y="25" width="46" height="28" rx="2" fill="white"/>
+<!-- Subtle inner shadow to give depth to the frame -->
+<rect x="16" y="25" width="46" height="28" rx="2" fill="rgba(0,0,0,0.06)"/>
+<!-- Black outline over everything -->
+<rect x="11" y="20" width="56" height="38" rx="5" stroke="black" stroke-width="3"/>
+<!-- Inner edge line (frame inner border) -->
+<rect x="16" y="25" width="46" height="28" rx="2" stroke="black" stroke-width="2"/>
+</svg>

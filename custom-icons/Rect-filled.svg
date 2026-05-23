@@ -1,0 +1,12 @@
+<svg width="78" height="78" viewBox="0 0 78 78" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- White glow outline -->
+<rect x="11" y="20" width="56" height="38" rx="5" stroke="white" stroke-width="6"/>
+<!-- Main fill -->
+<rect x="11" y="20" width="56" height="38" rx="5" fill="#E91E8C"/>
+<!-- Top highlight band -->
+<path d="M16 20 H67 V31 H11 V25 Q11 20 16 20 Z" fill="#F06BAE"/>
+<!-- Bottom shadow band -->
+<path d="M11 47 H67 V53 Q67 58 62 58 H16 Q11 58 11 53 Z" fill="#B01065"/>
+<!-- Black outline -->
+<rect x="11" y="20" width="56" height="38" rx="5" stroke="black" stroke-width="3"/>
+</svg>
