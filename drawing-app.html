@@ -3777,23 +3777,21 @@ function strokeJaggedRing(targetCtx, cx, cy, r, thickness, css, alpha, table){
 function doBoom(cx,cy){
   saveHistory();
   lastStrokePoints=null;
-  var baseR=200+Math.random()*70;
-  var fragCount=22+Math.floor(Math.random()*10);
+  var baseR=200+Math.random()*60;
+  var fragCount=44+Math.floor(Math.random()*16);
 
-  // === Build irregular polygon fragments covering the blast area ===
-  // Each fragment is a star-shaped convex polygon seeded at a random point
-  // within the blast circle. Vertices are sampled at sorted random angles with
-  // varying radii so no two shards look alike.
+  // === Build fragments seeded from a ring, so the centre is never touched ===
+  var clearR=baseR*0.32; // inner dead zone — no fragment starts here
   var frags=[];
   for(var i=0;i<fragCount;i++){
     var a=Math.random()*6.2832;
-    var r=Math.sqrt(Math.random())*baseR*0.88;
+    var r=clearR+Math.sqrt(Math.random())*(baseR*0.9-clearR);
     var fcx=cx+Math.cos(a)*r, fcy=cy+Math.sin(a)*r;
-    var nv=5+Math.floor(Math.random()*5);
+    var nv=4+Math.floor(Math.random()*5);
     var angs=[];
     for(var j=0;j<nv;j++) angs.push(Math.random()*6.2832);
     angs.sort(function(a,b){return a-b;});
-    var fR=baseR*(0.18+Math.random()*0.28);
+    var fR=baseR*(0.07+Math.random()*0.12);
     var verts=[];
     for(var j=0;j<angs.length;j++){
       var vr=fR*(0.5+Math.random()*0.7);
@@ -3801,29 +3799,26 @@ function doBoom(cx,cy){
     }
     var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
     for(var j=0;j<verts.length;j++){
-      if(verts[j].x<minX) minX=verts[j].x; if(verts[j].y<minY) minY=verts[j].y;
-      if(verts[j].x>maxX) maxX=verts[j].x; if(verts[j].y>maxY) maxY=verts[j].y;
+      if(verts[j].x<minX)minX=verts[j].x; if(verts[j].y<minY)minY=verts[j].y;
+      if(verts[j].x>maxX)maxX=verts[j].x; if(verts[j].y>maxY)maxY=verts[j].y;
     }
     minX=Math.max(0,Math.floor(minX)); minY=Math.max(0,Math.floor(minY));
     maxX=Math.min(canvasW,Math.ceil(maxX)); maxY=Math.min(canvasH,Math.ceil(maxY));
     var fw=maxX-minX, fh=maxY-minY;
     if(fw<2||fh<2) continue;
     var dx=fcx-cx, dy=fcy-cy, dist=Math.sqrt(dx*dx+dy*dy)||1;
-    var spd=3+Math.random()*8;
+    var spd=1.8+(dist/baseR)*5+Math.random()*2.5;
     frags.push({
       verts:verts, cx:fcx, cy:fcy, minX:minX, minY:minY, fw:fw, fh:fh,
       x:0, y:0,
-      vx:(dx/dist)*spd+(Math.random()-0.5)*2,
-      vy:(dy/dist)*spd+(Math.random()-0.5)*2-1.5,
-      rot:0, rotSpeed:(Math.random()-0.5)*0.09,
-      frame:0, maxFrame:28+Math.floor(Math.random()*28), done:false
+      vx:(dx/dist)*spd+(Math.random()-0.5)*1.5,
+      vy:(dy/dist)*spd+(Math.random()-0.5)*1.5,
+      rot:0, rotSpeed:(Math.random()-0.5)*0.06,
+      frame:0, maxFrame:22+Math.floor(Math.random()*20), done:false
     });
   }
 
-  // === Capture pixels for each fragment via polygon clip + drawImage ===
-  // fc is sized in physical pixels; drawImage copies from the physical main
-  // canvas at the correct offset so the right region lands at (0,0) in fc.
-  // The clip polygon is also expressed in physical coords so they align.
+  // === Capture pixels + apply distortion (CA + pixel scramble) per shard ===
   for(var i=0;i<frags.length;i++){
     var f=frags[i];
     var pw=f.fw*DPR, ph=f.fh*DPR;
@@ -3835,16 +3830,51 @@ function doBoom(cx,cy){
       fctx.lineTo((f.verts[j].x-f.minX)*DPR,(f.verts[j].y-f.minY)*DPR);
     fctx.closePath(); fctx.clip();
     fctx.drawImage(canvas,-f.minX*DPR,-f.minY*DPR);
+
+    var imgData=fctx.getImageData(0,0,pw,ph);
+    var src=imgData.data;
+    var out=new Uint8ClampedArray(src.length);
+    var caShift=2+Math.floor(Math.random()*3);
+
+    // Chromatic aberration: R channel shifts left, B shifts right
+    for(var y=0;y<ph;y++){
+      for(var x=0;x<pw;x++){
+        var di=(y*pw+x)*4;
+        if(src[di+3]===0){out[di+3]=0;continue;}
+        var rx=Math.max(0,x-caShift), bx2=Math.min(pw-1,x+caShift);
+        out[di  ]=src[(y*pw+rx)*4  ];
+        out[di+1]=src[di+1];
+        out[di+2]=src[(y*pw+bx2)*4+2];
+        out[di+3]=src[di+3];
+      }
+    }
+
+    // Pixel scramble: swap 2×2 blocks randomly within shard
+    var bsz=2, nbx=Math.floor(pw/bsz), nby=Math.floor(ph/bsz);
+    var swaps=Math.floor(nbx*nby*0.12);
+    for(var s=0;s<swaps;s++){
+      var ax=Math.floor(Math.random()*nbx)*bsz, ay=Math.floor(Math.random()*nby)*bsz;
+      if(out[(ay*pw+ax)*4+3]===0) continue;
+      var nx=ax+(Math.floor(Math.random()*9)-4)*bsz, ny=ay+(Math.floor(Math.random()*9)-4)*bsz;
+      nx=Math.max(0,Math.min((nbx-1)*bsz,nx)); ny=Math.max(0,Math.min((nby-1)*bsz,ny));
+      if(out[(ny*pw+nx)*4+3]===0) continue;
+      for(var by=0;by<bsz;by++) for(var bx3=0;bx3<bsz;bx3++){
+        var ai=((ay+by)*pw+(ax+bx3))*4, bi=((ny+by)*pw+(nx+bx3))*4;
+        for(var c=0;c<4;c++){var tmp=out[ai+c];out[ai+c]=out[bi+c];out[bi+c]=tmp;}
+      }
+    }
+
+    fctx.putImageData(new ImageData(out,pw,ph),0,0);
     f.img=fc;
   }
 
-  // === Clear the blast area with a jagged crater stamp ===
-  var craterStamp=buildJaggedBlobStamp(baseR*0.92,BG_CSS,makeNoiseSeed(),0.22);
+  // === Clear blast area ===
+  var craterStamp=buildJaggedBlobStamp(baseR*0.88,BG_CSS,makeNoiseSeed(),0.22);
   ctx.save(); stampDot(ctx,cx,cy,craterStamp); ctx.restore();
 
-  // === Animate fragments flying outward, then stamp permanently onto ctx ===
-  // Shards fly on the overlay for their individual flight durations, then get
-  // committed to the main canvas at their landing position so they build up.
+  // === Animate shards outward at full opacity; stamp to canvas on landing frame ===
+  // Drawing to ovCtx and ctx in the same frame when a shard lands means there is
+  // no visible gap between the in-flight overlay version and the permanent canvas version.
   var frame=0;
   function animBoom(){
     ovCtx.clearRect(0,0,canvasW,canvasH);
@@ -3852,23 +3882,31 @@ function doBoom(cx,cy){
     for(var i=0;i<frags.length;i++){
       var f=frags[i];
       if(!f.img||f.done) continue;
-      f.x+=f.vx; f.y+=f.vy; f.vy+=0.15; f.rot+=f.rotSpeed; f.frame++;
-      var t=f.frame/f.maxFrame;
-      if(t>=1){
+      f.vx*=0.88; f.vy*=0.88; // friction — top-down blast, no gravity
+      f.x+=f.vx; f.y+=f.vy; f.rot+=f.rotSpeed; f.frame++;
+      // Permanent pixel trail: stamp every 3 frames, but only once the fragment
+      // centroid has moved outside the clear zone so trails never fill the centre.
+      if(f.frame%3===0){
+        var tdx=f.cx+f.x-cx, tdy=f.cy+f.y-cy;
+        if(tdx*tdx+tdy*tdy>clearR*clearR){
+          ctx.save(); ctx.globalAlpha=0.13;
+          ctx.translate(f.cx+f.x,f.cy+f.y); ctx.rotate(f.rot);
+          ctx.drawImage(f.img,-(f.cx-f.minX),-(f.cy-f.minY),f.fw,f.fh);
+          ctx.restore();
+        }
+      }
+      ovCtx.save();
+      ovCtx.translate(f.cx+f.x,f.cy+f.y); ovCtx.rotate(f.rot);
+      ovCtx.drawImage(f.img,-(f.cx-f.minX),-(f.cy-f.minY),f.fw,f.fh);
+      ovCtx.restore();
+      if(f.frame>=f.maxFrame){
         f.done=true;
         ctx.save();
-        ctx.translate(f.cx+f.x, f.cy+f.y);
-        ctx.rotate(f.rot);
+        ctx.translate(f.cx+f.x,f.cy+f.y); ctx.rotate(f.rot);
         ctx.drawImage(f.img,-(f.cx-f.minX),-(f.cy-f.minY),f.fw,f.fh);
         ctx.restore();
       } else {
         alive=true;
-        ovCtx.save();
-        ovCtx.globalAlpha=t<0.75?1:1-(t-0.75)/0.25;
-        ovCtx.translate(f.cx+f.x, f.cy+f.y);
-        ovCtx.rotate(f.rot);
-        ovCtx.drawImage(f.img,-(f.cx-f.minX),-(f.cy-f.minY),f.fw,f.fh);
-        ovCtx.restore();
       }
     }
     if(alive&&++frame<120) requestAnimationFrame(animBoom);
