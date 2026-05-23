@@ -7,72 +7,105 @@ function easeOut(t) {
   return 1 - Math.pow(1 - t, 3);
 }
 
-// Draw a bezier-curve leaf. Caller sets ctx.globalAlpha before calling.
-// cx/cy are the base (stem attachment), dx/dy are the normalised growth direction.
-function drawLeaf(ctx, cx, cy, dx, dy, len, squat, fillColor, rimColor) {
+// Leaf object fields used by drawLeaf (all set at spawn, never mutated):
+//   dx, dy      — normalised growth direction
+//   len         — total length
+//   squat       — width-to-length ratio
+//   peakT       — where the leaf is widest (0–1 along length)
+//   asym        — left/right bulge asymmetry (–1..+1)
+//   fillColor   — base fill colour
+//   rimColor    — vein and edge colour
+//   veins       — array of {t, side, reach}
+//
+// Caller must ctx.translate(cx, cy) and set ctx.globalAlpha before calling.
+function drawLeaf(ctx, leaf) {
   ctx.save();
 
-  var halfW = len * squat * 0.5;
+  var dx = leaf.dx, dy = leaf.dy;
+  var len = leaf.len;
+  var halfW = len * leaf.squat * 0.5;
   var px = -dy, py = dx;
-  var peakT = 0.42;
+  var pt = leaf.peakT;
+  var al = leaf.asym;
+  var lhw = halfW * (1 + al); // left-side bulge
+  var rhw = halfW * (1 - al); // right-side bulge
+  var baseAlpha = ctx.globalAlpha;
 
-  function leafPath(ox, oy, l, hw) {
+  function mainPath() {
     ctx.beginPath();
-    ctx.moveTo(ox, oy);
+    ctx.moveTo(0, 0);
     ctx.bezierCurveTo(
-      ox + dx * l * 0.10 - px * hw * 0.55, oy + dy * l * 0.10 - py * hw * 0.55,
-      ox + dx * l * peakT - px * hw,        oy + dy * l * peakT - py * hw,
-      ox + dx * l,                           oy + dy * l
+      dx * len * 0.10 - px * lhw * 0.55, dy * len * 0.10 - py * lhw * 0.55,
+      dx * len * pt   - px * lhw,         dy * len * pt   - py * lhw,
+      dx * len,                            dy * len
     );
     ctx.bezierCurveTo(
-      ox + dx * l * peakT + px * hw,        oy + dy * l * peakT + py * hw,
-      ox + dx * l * 0.10 + px * hw * 0.55, oy + dy * l * 0.10 + py * hw * 0.55,
-      ox, oy
+      dx * len * pt   + px * rhw,          dy * len * pt   + py * rhw,
+      dx * len * 0.10 + px * rhw * 0.55,  dy * len * 0.10 + py * rhw * 0.55,
+      0, 0
     );
     ctx.closePath();
   }
 
-  var baseAlpha = ctx.globalAlpha;
+  // Gradient fill: richer/darker at base, lighter at tip
+  var grad = ctx.createLinearGradient(0, 0, dx * len, dy * len);
+  grad.addColorStop(0.00, shadeColor(leaf.fillColor, -0.12, +5));
+  grad.addColorStop(0.45, leaf.fillColor);
+  grad.addColorStop(1.00, shadeColor(leaf.fillColor, +0.22, -8));
 
-  // Main leaf body
-  leafPath(cx, cy, len, halfW);
-  ctx.fillStyle = fillColor;
-  ctx.globalAlpha = baseAlpha * 0.90;
+  mainPath();
+  ctx.fillStyle = grad;
+  ctx.globalAlpha = baseAlpha * 0.92;
   ctx.fill();
 
-  // Rim stroke
-  ctx.strokeStyle = rimColor;
-  ctx.lineWidth = Math.max(0.5, len * 0.025);
+  // Soft rim
+  mainPath();
+  ctx.strokeStyle = leaf.rimColor;
+  ctx.lineWidth = Math.max(0.4, len * 0.018);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.globalAlpha = baseAlpha * 0.28;
+  ctx.globalAlpha = baseAlpha * 0.20;
   ctx.stroke();
 
-  // Highlight — smaller leaf offset toward the lit side
-  var hiLen = len * 0.68, hiHW = halfW * 0.42;
-  leafPath(cx + px * halfW * 0.25, cy + py * halfW * 0.25, hiLen, hiHW);
-  ctx.fillStyle = shadeColor(fillColor, +0.30, -6);
-  ctx.globalAlpha = baseAlpha * 0.36;
-  ctx.fill();
-
-  // Midrib
+  // Midrib — curves slightly toward the heavier side
+  var mCtrlX = dx * len * 0.48 - px * halfW * al * 0.28;
+  var mCtrlY = dy * len * 0.48 - py * halfW * al * 0.28;
   ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(cx + dx * len * 0.86, cy + dy * len * 0.86);
-  ctx.strokeStyle = rimColor;
-  ctx.lineWidth = Math.max(0.4, len * 0.02);
-  ctx.globalAlpha = baseAlpha * 0.30;
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(mCtrlX, mCtrlY, dx * len * 0.88, dy * len * 0.88);
+  ctx.strokeStyle = leaf.rimColor;
+  ctx.lineWidth = Math.max(0.5, len * 0.028);
+  ctx.globalAlpha = baseAlpha * 0.38;
   ctx.stroke();
+
+  // Side veins — curved branches off the midrib, alternating sides
+  ctx.lineWidth = Math.max(0.3, len * 0.014);
+  ctx.globalAlpha = baseAlpha * 0.24;
+  for (var v = 0; v < leaf.veins.length; v++) {
+    var vn = leaf.veins[v];
+    var vbx = dx * len * vn.t;
+    var vby = dy * len * vn.t;
+    // leaf width at this t position (sine profile)
+    var leafWatT = halfW * Math.sin(Math.PI * vn.t) * 0.9;
+    var sideX = vn.side * px, sideY = vn.side * py;
+    var vtipX = vbx + (dx * len * 0.10 + sideX * leafWatT) * vn.reach;
+    var vtipY = vby + (dy * len * 0.10 + sideY * leafWatT) * vn.reach;
+    var vcpX  = vbx + sideX * leafWatT * 0.5 * vn.reach;
+    var vcpY  = vby + sideY * leafWatT * 0.5 * vn.reach;
+    ctx.beginPath();
+    ctx.moveTo(vbx, vby);
+    ctx.quadraticCurveTo(vcpX, vcpY, vtipX, vtipY);
+    ctx.stroke();
+  }
 
   ctx.restore();
 }
 
-// Draw a leaf at full scale to the given context (used when committing).
 function commitLeaf(ctx, leaf) {
   ctx.save();
   ctx.translate(leaf.cx, leaf.cy);
   ctx.globalAlpha = leaf.alpha;
-  drawLeaf(ctx, 0, 0, leaf.dx, leaf.dy, leaf.len, leaf.squat, leaf.fillColor, leaf.rimColor);
+  drawLeaf(ctx, leaf);
   ctx.restore();
 }
 
@@ -95,12 +128,11 @@ function vineOverlayFrame() {
       return false;
     }
 
-    // Draw growing leaf on overlay, scaled around its base point
     state.ovCtx.save();
     state.ovCtx.translate(leaf.cx, leaf.cy);
     state.ovCtx.scale(scale, scale);
-    state.ovCtx.globalAlpha = leaf.alpha * (0.35 + 0.65 * t); // fade in as it grows
-    drawLeaf(state.ovCtx, 0, 0, leaf.dx, leaf.dy, leaf.len, leaf.squat, leaf.fillColor, leaf.rimColor);
+    state.ovCtx.globalAlpha = leaf.alpha * (0.35 + 0.65 * t);
+    drawLeaf(state.ovCtx, leaf);
     state.ovCtx.restore();
 
     return true;
@@ -111,7 +143,8 @@ function vineOverlayFrame() {
 
 export function drawVineStrokeV2(x, y, col) {
   if (!state.vineStrokeV2) {
-    var leafBase = Math.max(20, state.brushSize * 1.25);
+    // Match original vine-brush.js sizing
+    var leafBase = Math.max(22, state.brushSize * 0.95);
     state.vineStrokeV2 = {
       lx: state.lastX, ly: state.lastY,
       dir: null,
@@ -120,10 +153,9 @@ export function drawVineStrokeV2(x, y, col) {
       side: 1,
       phase: Math.random() * Math.PI * 2,
       leafBase: leafBase,
-      leafSquat: 0.50 + Math.random() * 0.22,
-      nextLeafSpacing: leafBase * (0.65 + Math.random() * 0.55),
+      nextLeafSpacing: leafBase * (0.7 + Math.random() * 0.55),
       stemDark: shadeColor(col, -0.22, +12),
-      stemHi: shadeColor(col, +0.20, -8),
+      stemHi:   shadeColor(col, +0.20, -8),
     };
   }
 
@@ -131,7 +163,6 @@ export function drawVineStrokeV2(x, y, col) {
   var ddx = x - st.lx, ddy = y - st.ly;
   var d = Math.hypot(ddx, ddy);
 
-  // Smooth direction tracking
   if (d > 0.3) {
     var ndx = ddx / d, ndy = ddy / d;
     if (!st.dir) {
@@ -144,9 +175,9 @@ export function drawVineStrokeV2(x, y, col) {
     }
   }
 
-  // Stem — drawn directly to main canvas
+  // Stem — direct to main canvas
   var stemW = Math.max(1.5, state.brushSize * 0.19);
-  var wob = 1 + 0.14 * Math.sin(st.stemDist * 0.020 + st.phase);
+  var wob   = 1 + 0.14 * Math.sin(st.stemDist * 0.020 + st.phase);
   var tdx = d > 0 ? ddx / d : (st.dir ? st.dir[0] : 1);
   var tdy = d > 0 ? ddy / d : (st.dir ? st.dir[1] : 0);
   var snx = -tdy, sny = tdx;
@@ -160,8 +191,8 @@ export function drawVineStrokeV2(x, y, col) {
   if (stemW > 2) {
     state.ctx.beginPath();
     state.ctx.moveTo(st.lx - snx * off, st.ly - sny * off);
-    state.ctx.lineTo(x - snx * off, y - sny * off);
-    state.ctx.lineWidth = stemW * 0.65;
+    state.ctx.lineTo(x   - snx * off, y   - sny * off);
+    state.ctx.lineWidth   = stemW * 0.65;
     state.ctx.strokeStyle = st.stemDark;
     state.ctx.globalAlpha = 0.40;
     state.ctx.stroke();
@@ -170,7 +201,7 @@ export function drawVineStrokeV2(x, y, col) {
   state.ctx.beginPath();
   state.ctx.moveTo(st.lx, st.ly);
   state.ctx.lineTo(x, y);
-  state.ctx.lineWidth = stemW * wob;
+  state.ctx.lineWidth   = stemW * wob;
   state.ctx.strokeStyle = col;
   state.ctx.globalAlpha = 1.0;
   state.ctx.stroke();
@@ -178,8 +209,8 @@ export function drawVineStrokeV2(x, y, col) {
   if (stemW > 2.5) {
     state.ctx.beginPath();
     state.ctx.moveTo(st.lx + snx * off * 0.6, st.ly + sny * off * 0.6);
-    state.ctx.lineTo(x + snx * off * 0.6, y + sny * off * 0.6);
-    state.ctx.lineWidth = stemW * 0.38;
+    state.ctx.lineTo(x   + snx * off * 0.6, y   + sny * off * 0.6);
+    state.ctx.lineWidth   = stemW * 0.38;
     state.ctx.strokeStyle = st.stemHi;
     state.ctx.globalAlpha = 0.42;
     state.ctx.stroke();
@@ -188,39 +219,55 @@ export function drawVineStrokeV2(x, y, col) {
   state.ctx.restore();
 
   st.lx = x; st.ly = y;
-  st.stemDist += d;
+  st.stemDist  += d;
   st.accumLeaf += d;
 
-  // Spawn leaves — added to live array so they animate on the overlay
+  // Spawn leaves
   while (st.accumLeaf >= st.nextLeafSpacing && st.dir) {
     st.accumLeaf -= st.nextLeafSpacing;
-    st.nextLeafSpacing = st.leafBase * (0.65 + Math.random() * 0.60);
+    st.nextLeafSpacing = st.leafBase * (0.7 + Math.random() * 0.55);
     st.side = -st.side;
 
     var tx = st.dir[0], ty = st.dir[1];
     var perpX = -ty * st.side, perpY = tx * st.side;
-    var bias = 0.06 + Math.random() * 0.20;
+    var bias = 0.05 + Math.random() * 0.18;
     var ldx = perpX * (1 - bias) + tx * bias;
     var ldy = perpY * (1 - bias) + ty * bias;
     var lm = Math.hypot(ldx, ldy) || 1;
     ldx /= lm; ldy /= lm;
 
-    var ang = (Math.random() - 0.5) * 0.80;
+    var ang = (Math.random() - 0.5) * 0.98;
     var ca = Math.cos(ang), sa = Math.sin(ang);
 
-    var leafLen = Math.max(16, state.brushSize * 1.35) * (0.75 + Math.random() * 0.55);
+    // Match original vine-brush.js leaf sizing
+    var sizeJitter = 1.05 + Math.random() * 0.5;
+    var leafLen = Math.max(18, state.brushSize * 1.4) * (0.78 + Math.random() * 0.55) * sizeJitter;
+
+    var numVeins = 3 + Math.floor(Math.random() * 2); // 3–4 veins
+    var veins = [];
+    for (var vi = 0; vi < numVeins; vi++) {
+      veins.push({
+        t:     0.20 + (vi / (numVeins - 1)) * 0.52,
+        side:  vi % 2 === 0 ? 1 : -1,
+        reach: 0.72 + Math.random() * 0.36,
+      });
+    }
+
     var leafCol = adjacentColor(col, 25);
 
     state.vineLiveLeaves.push({
       cx: x, cy: y,
       dx: ldx * ca - ldy * sa,
       dy: ldx * sa + ldy * ca,
-      len: leafLen,
-      squat: st.leafSquat,
+      len:       leafLen,
+      squat:     0.26 + Math.random() * 0.16, // narrower, like original (0.24–0.38 range)
+      peakT:     0.36 + Math.random() * 0.14,
+      asym:      (Math.random() - 0.5) * 0.50,
       fillColor: leafCol,
-      rimColor: shadeColor(leafCol, -0.25, +8),
-      alpha: 0.78 + Math.random() * 0.18,
-      born: performance.now(),
+      rimColor:  shadeColor(leafCol, -0.25, +8),
+      veins:     veins,
+      alpha:     0.82 + Math.random() * 0.14,
+      born:      performance.now(),
       growDuration: GROW_DURATION + Math.random() * 80,
     });
 
@@ -231,7 +278,6 @@ export function drawVineStrokeV2(x, y, col) {
 }
 
 export function finalizeVineStrokeV2() {
-  // Commit any leaves still animating immediately
   state.vineLiveLeaves.forEach(function(leaf) { commitLeaf(state.ctx, leaf); });
   state.vineLiveLeaves = [];
 
