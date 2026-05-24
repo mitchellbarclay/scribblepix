@@ -47,14 +47,6 @@ export function drawStroke(x, y) {
       state.lastX=_savLastX; state.boltStroke=_savBS; state.boltPtsA=_savPA; state.boltPtsB=_savPB; state.boltMorphStart=_savMS; state.boltCommits=_savBC;
     }
   } else if (state.tool === 'vine') {
-    drawVineStroke(x, y, c);
-    if (state.mirrorMode) {
-      var _savLastX=state.lastX, _savVS=state.vineStroke;
-      state.lastX=state.canvasW-_savLastX; state.vineStroke=state.mirrorVineStroke;
-      drawVineStroke(state.canvasW-x, y, c);
-      state.mirrorVineStroke=state.vineStroke; state.vineStroke=_savVS; state.lastX=_savLastX;
-    }
-  } else if (state.tool === 'vine2') {
     drawVineStrokeV2(x, y, c);
     if (state.mirrorMode) {
       var _savLastX=state.lastX, _savV2=state.vineStrokeV2;
