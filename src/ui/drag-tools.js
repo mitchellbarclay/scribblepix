@@ -659,7 +659,7 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
     state.ovCtx.fill();
     // Two scan lines travelling downward
     for (var s = 0; s < 2; s++) {
-      var frac = ((now * 0.0024 + s * 0.5) % 1);
+      var frac = ((now * 0.0014 + s * 0.5) % 1);
       var scanY = topY + (botY - topY) * frac;
       var scanW = topW + (botW - topW) * frac;
       state.ovCtx.strokeStyle = 'rgba(255,255,255,0.48)';
@@ -714,9 +714,9 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
       var rx = Math.min(pw, Math.round(cPx + hw));
       for (var col = lx; col < rx; col++) {
         var idx = (row * pw + col) * 4;
-        d[idx]   = 255 - d[idx];
-        d[idx+1] = 255 - d[idx+1];
-        d[idx+2] = 255 - d[idx+2];
+        // Cyclic channel rotation: [r,g,b] → [g,b,r] — white stays white, colors shift alien
+        var r = d[idx], g = d[idx+1], b = d[idx+2];
+        d[idx] = g; d[idx+1] = b; d[idx+2] = r;
       }
     }
     state.ctx.putImageData(id, x0, y0);
@@ -743,6 +743,7 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
     if (phase === 'descend') {
       var t = Math.min(1, elapsed / 400);
       var e = 1 - Math.pow(1 - t, 3);
+      ghostEl.style.left = (canvasRect.left + beamX) + 'px';
       ghostEl.style.top = (canvasRect.top + dropY + (hoverY - dropY) * e) + 'px';
       ghostEl.style.transform = 'translate(-50%,-50%)';
       if (t >= 1) { phase = 'beaming'; phaseT = now; }
@@ -750,8 +751,9 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
     } else if (phase === 'beaming') {
       beamExtent = Math.min(1, elapsed / 520);
       drawBeam(beamExtent, now);
+      ghostEl.style.left = (canvasRect.left + beamX) + 'px';
       ghostEl.style.top = (canvasRect.top + hoverY) + 'px';
-      ghostEl.style.transform = 'translate(-50%,-50%) scale(' + (1 + Math.sin(now * 0.02) * 0.05) + ')';
+      ghostEl.style.transform = 'translate(-50%,-50%) scale(' + (1 + Math.sin(now * 0.02) * 0.04) + ')';
       if (beamExtent >= 1) {
         if (particleTimer <= 0) { spawnParticle(); particleTimer = 0.07; }
         if (!invertDone && elapsed > 750) { doInvert(); invertDone = true; }
@@ -810,30 +812,65 @@ function alienStarblast(dropX, dropY, ghostEl, onDone) {
   var shockwaves = [];
   var flashX = 0, flashY = 0, flashAlpha = 0, flashR = 0;
 
-  function doBlast(cx, cy) {
-    var rays = 8 + Math.floor(Math.random() * 7);
+  function doBlast(cx, cy, onBurstDone) {
+    var nRays = 8 + Math.floor(Math.random() * 7);
     var maxLen = 55 + Math.random() * 85;
-    for (var i = 0; i < rays; i++) {
-      var angle = (i / rays) * Math.PI * 2 + Math.random() * 0.2;
-      var len = maxLen * (0.6 + Math.random() * 0.4);
-      var lw = 3 + Math.random() * 5;
-      var col = pickAlienColor();
-      state.ctx.save();
-      state.ctx.strokeStyle = col; state.ctx.lineWidth = lw; state.ctx.lineCap = 'round';
-      state.ctx.beginPath(); state.ctx.moveTo(cx, cy);
-      state.ctx.lineTo(cx + Math.cos(angle) * len, cy + Math.sin(angle) * len); state.ctx.stroke();
-      state.ctx.fillStyle = col;
-      state.ctx.beginPath(); state.ctx.arc(cx + Math.cos(angle) * len, cy + Math.sin(angle) * len, lw * 0.8, 0, Math.PI * 2); state.ctx.fill();
-      state.ctx.restore();
+    var rayData = [];
+    for (var i = 0; i < nRays; i++) {
+      rayData.push({
+        angle: (i / nRays) * Math.PI * 2 + Math.random() * 0.25,
+        len: maxLen * (0.55 + Math.random() * 0.45),
+        lw: 3.5 + Math.random() * 5,
+        color: pickAlienColor(),
+        progress: 0
+      });
     }
-    // Bright centre
-    var cg = state.ctx.createRadialGradient(cx, cy, 0, cx, cy, maxLen * 0.2);
-    cg.addColorStop(0, 'rgba(255,255,255,0.95)'); cg.addColorStop(1, 'rgba(255,255,255,0)');
-    state.ctx.fillStyle = cg;
-    state.ctx.beginPath(); state.ctx.arc(cx, cy, maxLen * 0.2, 0, Math.PI * 2); state.ctx.fill();
-    // Queue shockwave + flash for the loop to animate
-    shockwaves.push({x: cx, y: cy, r: 4, maxR: maxLen * 0.8, alpha: 0.9, color: pickAlienColor()});
-    flashX = cx; flashY = cy; flashAlpha = 1; flashR = maxLen * 0.55;
+    // Immediate flash + shockwave
+    shockwaves.push({x: cx, y: cy, r: 4, maxR: maxLen * 0.85, alpha: 0.9, color: pickAlienColor()});
+    flashX = cx; flashY = cy; flashAlpha = 1; flashR = maxLen * 0.6;
+
+    var burstT0 = performance.now();
+    var BURST_DUR = 360;
+    function burstFrame() {
+      var now = performance.now();
+      var t = Math.min(1, (now - burstT0) / BURST_DUR);
+      for (var i = 0; i < rayData.length; i++) {
+        var rd = rayData[i];
+        // Slight stagger per ray so they don't all arrive at once
+        var stagger = i / nRays * 0.18;
+        var rayT = t < stagger ? 0 : Math.min(1, (t - stagger) / (1 - stagger));
+        var newProg = 1 - Math.pow(1 - rayT, 2.5);
+        if (newProg <= rd.progress + 0.001) continue;
+        var x0 = cx + Math.cos(rd.angle) * rd.len * rd.progress;
+        var y0 = cy + Math.sin(rd.angle) * rd.len * rd.progress;
+        var x1 = cx + Math.cos(rd.angle) * rd.len * newProg;
+        var y1 = cy + Math.sin(rd.angle) * rd.len * newProg;
+        state.ctx.save();
+        state.ctx.strokeStyle = rd.color;
+        state.ctx.lineWidth = rd.lw;
+        state.ctx.lineCap = rd.progress < 0.01 ? 'round' : 'butt';
+        state.ctx.beginPath(); state.ctx.moveTo(x0, y0); state.ctx.lineTo(x1, y1); state.ctx.stroke();
+        state.ctx.restore();
+        rd.progress = newProg;
+      }
+      if (t < 1) { requestAnimationFrame(burstFrame); return; }
+      // Finalise: tip dots + bright centre
+      for (var i = 0; i < rayData.length; i++) {
+        var rd = rayData[i];
+        state.ctx.save();
+        state.ctx.fillStyle = rd.color;
+        state.ctx.beginPath();
+        state.ctx.arc(cx + Math.cos(rd.angle) * rd.len, cy + Math.sin(rd.angle) * rd.len, rd.lw * 0.85, 0, Math.PI * 2);
+        state.ctx.fill();
+        state.ctx.restore();
+      }
+      var cg = state.ctx.createRadialGradient(cx, cy, 0, cx, cy, maxLen * 0.18);
+      cg.addColorStop(0, 'rgba(255,255,255,0.95)'); cg.addColorStop(1, 'rgba(255,255,255,0)');
+      state.ctx.fillStyle = cg;
+      state.ctx.beginPath(); state.ctx.arc(cx, cy, maxLen * 0.18, 0, Math.PI * 2); state.ctx.fill();
+      onBurstDone();
+    }
+    requestAnimationFrame(burstFrame);
   }
 
   var lastT = performance.now();
