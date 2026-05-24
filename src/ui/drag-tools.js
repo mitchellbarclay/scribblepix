@@ -491,6 +491,9 @@ function alienFlight(dropX, dropY, ghostEl, onDone) {
   var legStart = {x:dropX, y:dropY}, legEnd = wps[0];
   var legT0 = performance.now(), lastReleaseT = 0, releaseInterval = 240;
   var drops = [], splashes = [], flightDone = false;
+  // Immediate big splash right at the drop point
+  var _ir = Math.max(10, Math.min(38, Math.round(state.brushSize * 0.6 + Math.random() * 8)));
+  splashes.push({stamps: buildSplashStamps(dropX, dropY, _ir), revealed: 0, color: pickAlienColor(), duration: 240+Math.random()*100, t0: performance.now()});
 
   function spawnDrop(x, y) {
     var fallDist = 80+Math.random()*180;
@@ -598,28 +601,57 @@ function alienFlight(dropX, dropY, ghostEl, onDone) {
 }
 
 // ---- Alien beam effect ----
+// UFO descends from above the drop point, fires a tractor beam down to it,
+// inverts the pixels inside the beam trapezoid, then ascends away.
 
 function alienBeam(dropX, dropY, ghostEl, onDone) {
   saveHistory();
   state.lastStrokePoints = null;
   var canvasRect = state.canvasArea.getBoundingClientRect();
-  var beamX = state.canvasW * (0.25 + Math.random() * 0.5);
-  var hoverY = state.canvasH * 0.1;
-  var beamBotY = state.canvasH * (0.45 + Math.random() * 0.35);
-  var beamHalfW = 35 + Math.random() * 50;
-  var beamHue = Math.floor(Math.random() * 360);
-  var phase = 'flying', phaseT = performance.now(), invertDone = false;
-  ghostEl.style.transition = 'none';
 
-  function drawBeam(ext) {
+  // Beam points directly at where the user dropped
+  var beamX = dropX;
+  var beamBotY = dropY;
+  var beamHalfW = 28 + Math.random() * 38;
+  var beamLen = Math.min(dropY - 5, 140 + Math.random() * 120);
+  var hoverY = Math.max(8, dropY - beamLen);
+  var startY = hoverY - 70;
+  var beamHue = Math.floor(Math.random() * 360);
+
+  var phase = 'descend', phaseT = performance.now();
+  var beamExtent = 0, invertDone = false;
+  var particles = [], particleTimer = 0;
+
+  ghostEl.style.transition = 'none';
+  ghostEl.style.opacity = '1';
+  ghostEl.style.left = (canvasRect.left + beamX) + 'px';
+  ghostEl.style.top  = (canvasRect.top + startY) + 'px';
+  ghostEl.style.transform = 'translate(-50%,-50%) scale(0.7)';
+
+  function spawnParticle() {
+    particles.push({
+      x: beamX + (Math.random() - 0.5) * beamHalfW * 1.3,
+      y: beamBotY - Math.random() * 25,
+      vy: -(55 + Math.random() * 75),
+      r: 1.5 + Math.random() * 2.5,
+      life: 1,
+      color: pickAlienColor(),
+      wobble: (Math.random() - 0.5) * 22,
+      wobblePhase: Math.random() * Math.PI * 2
+    });
+  }
+
+  function drawBeam(ext, now) {
     state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
     if (ext <= 0) return;
-    var topY = hoverY + 12, botY = topY + (beamBotY - topY) * ext;
-    var topW = 6, botW = beamHalfW * ext;
+    var topY = hoverY + 10;
+    var botY = topY + (beamBotY - topY) * ext;
+    var topW = 5, botW = beamHalfW * Math.min(1, ext * 1.8);
+    // Main cone
     var grad = state.ovCtx.createLinearGradient(beamX, topY, beamX, botY);
-    grad.addColorStop(0, 'rgba(255,255,255,0.85)');
-    grad.addColorStop(0.35, 'hsla(' + beamHue + ',100%,68%,0.55)');
-    grad.addColorStop(1, 'hsla(' + beamHue + ',100%,68%,0.08)');
+    grad.addColorStop(0, 'rgba(255,255,255,0.92)');
+    grad.addColorStop(0.35, 'hsla(' + beamHue + ',100%,72%,0.58)');
+    grad.addColorStop(1, 'hsla(' + beamHue + ',100%,72%,0.07)');
     state.ovCtx.beginPath();
     state.ovCtx.moveTo(beamX - topW, topY);
     state.ovCtx.lineTo(beamX + topW, topY);
@@ -628,112 +660,223 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
     state.ovCtx.closePath();
     state.ovCtx.fillStyle = grad;
     state.ovCtx.fill();
-    var scanY = topY + (botY - topY) * ((performance.now() * 0.0025) % 1);
-    var scanW = topW + (botW - topW) * ((scanY - topY) / (botY - topY));
-    state.ovCtx.strokeStyle = 'rgba(255,255,255,0.5)';
-    state.ovCtx.lineWidth = 2;
-    state.ovCtx.beginPath();
-    state.ovCtx.moveTo(beamX - scanW, scanY);
-    state.ovCtx.lineTo(beamX + scanW, scanY);
-    state.ovCtx.stroke();
+    // Two scan lines travelling downward
+    for (var s = 0; s < 2; s++) {
+      var frac = ((now * 0.0024 + s * 0.5) % 1);
+      var scanY = topY + (botY - topY) * frac;
+      var scanW = topW + (botW - topW) * frac;
+      state.ovCtx.strokeStyle = 'rgba(255,255,255,0.48)';
+      state.ovCtx.lineWidth = 1.5;
+      state.ovCtx.beginPath();
+      state.ovCtx.moveTo(beamX - scanW, scanY);
+      state.ovCtx.lineTo(beamX + scanW, scanY);
+      state.ovCtx.stroke();
+    }
+    // Landing ellipse glow
+    if (ext > 0.8) {
+      var ga = ((ext - 0.8) / 0.2) * (0.45 + Math.sin(now * 0.013) * 0.2);
+      var rg = state.ovCtx.createRadialGradient(beamX, botY, 0, beamX, botY, botW * 0.95);
+      rg.addColorStop(0, 'hsla(' + beamHue + ',100%,85%,' + ga + ')');
+      rg.addColorStop(1, 'hsla(' + beamHue + ',100%,85%,0)');
+      state.ovCtx.fillStyle = rg;
+      state.ovCtx.beginPath();
+      state.ovCtx.ellipse(beamX, botY, botW * 0.95, botW * 0.28, 0, 0, Math.PI * 2);
+      state.ovCtx.fill();
+    }
+    // Abduction particles
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      state.ovCtx.save();
+      state.ovCtx.globalAlpha = p.life * 0.9;
+      state.ovCtx.fillStyle = p.color;
+      state.ovCtx.beginPath();
+      state.ovCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      state.ovCtx.fill();
+      state.ovCtx.restore();
+    }
   }
 
   function doInvert() {
-    var x0 = Math.max(0, Math.round((beamX - beamHalfW) * state.DPR));
-    var y0 = Math.max(0, Math.round(hoverY * state.DPR));
-    var x1 = Math.min(state.canvas.width, Math.round((beamX + beamHalfW) * state.DPR));
-    var y1 = Math.min(state.canvas.height, Math.round(beamBotY * state.DPR));
+    // Invert only pixels inside the trapezoid — no rectangular black bar
+    var topY = hoverY + 10, botY = beamBotY, topW = 5, botW = beamHalfW;
+    var x0 = Math.max(0, Math.floor((beamX - botW - 2) * state.DPR));
+    var y0 = Math.max(0, Math.floor(topY * state.DPR));
+    var x1 = Math.min(state.canvas.width,  Math.ceil((beamX + botW + 2) * state.DPR));
+    var y1 = Math.min(state.canvas.height, Math.ceil(botY * state.DPR));
     var pw = x1 - x0, ph = y1 - y0;
     if (pw <= 0 || ph <= 0) return;
     var id = state.ctx.getImageData(x0, y0, pw, ph);
     var d = id.data;
-    for (var i = 0; i < d.length; i += 4) {
-      d[i] = 255 - d[i]; d[i + 1] = 255 - d[i + 1]; d[i + 2] = 255 - d[i + 2];
+    for (var row = 0; row < ph; row++) {
+      var cssY = (row + y0) / state.DPR;
+      var t = (cssY - topY) / (botY - topY);
+      if (t < 0 || t > 1) continue;
+      var hw = (topW + (botW - topW) * t) * state.DPR;
+      var cPx = beamX * state.DPR - x0;
+      var lx = Math.max(0, Math.round(cPx - hw));
+      var rx = Math.min(pw, Math.round(cPx + hw));
+      for (var col = lx; col < rx; col++) {
+        var idx = (row * pw + col) * 4;
+        d[idx]   = 255 - d[idx];
+        d[idx+1] = 255 - d[idx+1];
+        d[idx+2] = 255 - d[idx+2];
+      }
     }
     state.ctx.putImageData(id, x0, y0);
   }
 
+  var lastT = performance.now();
   function frame() {
-    var now = performance.now(), elapsed = now - phaseT;
-    if (phase === 'flying') {
-      var t = Math.min(1, elapsed / 600);
+    var now = performance.now();
+    var dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+    var elapsed = now - phaseT;
+
+    // Update particles
+    particleTimer -= dt;
+    for (var i = particles.length - 1; i >= 0; i--) {
+      var p = particles[i];
+      p.wobblePhase += dt * 3;
+      p.x += Math.sin(p.wobblePhase) * p.wobble * dt;
+      p.y += p.vy * dt;
+      p.life -= dt * 1.4;
+      if (p.life <= 0 || p.y < hoverY) particles.splice(i, 1);
+    }
+
+    if (phase === 'descend') {
+      var t = Math.min(1, elapsed / 500);
       var e = 1 - Math.pow(1 - t, 3);
-      ghostEl.style.left = (canvasRect.left + dropX + (beamX - dropX) * e) + 'px';
-      ghostEl.style.top  = (canvasRect.top  + dropY + (hoverY - dropY) * e) + 'px';
-      ghostEl.style.transform = 'translate(-50%,-50%)';
+      ghostEl.style.top = (canvasRect.top + startY + (hoverY - startY) * e) + 'px';
+      ghostEl.style.transform = 'translate(-50%,-50%) scale(' + (0.7 + e * 0.3) + ')';
       if (t >= 1) { phase = 'beaming'; phaseT = now; }
+
     } else if (phase === 'beaming') {
-      var ext = Math.min(1, elapsed / 450);
-      drawBeam(ext);
-      ghostEl.style.left = (canvasRect.left + beamX) + 'px';
-      ghostEl.style.top  = (canvasRect.top + hoverY) + 'px';
-      ghostEl.style.transform = 'translate(-50%,-50%) scale(' + (1 + Math.sin(now * 0.025) * 0.05) + ')';
-      if (ext >= 1 && !invertDone) { doInvert(); invertDone = true; }
-      if (elapsed > 1000) { phase = 'retracting'; phaseT = now; }
+      beamExtent = Math.min(1, elapsed / 520);
+      drawBeam(beamExtent, now);
+      ghostEl.style.top = (canvasRect.top + hoverY) + 'px';
+      ghostEl.style.transform = 'translate(-50%,-50%) scale(' + (1 + Math.sin(now * 0.02) * 0.05) + ')';
+      if (beamExtent >= 1) {
+        if (particleTimer <= 0) { spawnParticle(); particleTimer = 0.07; }
+        if (!invertDone && elapsed > 750) { doInvert(); invertDone = true; }
+      }
+      if (elapsed > 1600) { phase = 'retracting'; phaseT = now; }
+
     } else if (phase === 'retracting') {
-      var t = Math.min(1, elapsed / 280);
-      drawBeam(1 - t);
-      if (t >= 1) { state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH); phase = 'leaving'; phaseT = now; }
-    } else if (phase === 'leaving') {
-      var t = Math.min(1, elapsed / 400);
-      ghostEl.style.left = (canvasRect.left + beamX) + 'px';
-      ghostEl.style.top  = (canvasRect.top + hoverY - state.canvasH * 0.35 * t * t) + 'px';
-      ghostEl.style.opacity = String(1 - t);
+      var t = Math.min(1, elapsed / 380);
+      drawBeam(1 - t * t, now);
+      if (t >= 1) {
+        particles = [];
+        state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
+        phase = 'ascend'; phaseT = now;
+      }
+
+    } else if (phase === 'ascend') {
+      var t = Math.min(1, elapsed / 500);
+      ghostEl.style.top  = (canvasRect.top + hoverY - state.canvasH * 0.55 * t * t) + 'px';
+      ghostEl.style.opacity = String(Math.max(0, 1 - t * 1.7));
       if (t >= 1) { onDone(); return; }
     }
+
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 }
 
 // ---- Alien starblast effect ----
+// First blast fires immediately at the drop point, then UFO teleports to 2-3
+// more positions for additional blasts. Charge rings expand before each blast.
 
 function alienStarblast(dropX, dropY, ghostEl, onDone) {
   saveHistory();
   state.lastStrokePoints = null;
   var canvasRect = state.canvasArea.getBoundingClientRect();
-  var nBlasts = 3 + Math.floor(Math.random() * 2);
-  var blasts = [];
-  for (var i = 0; i < nBlasts; i++) {
-    blasts.push({ x: state.canvasW * (0.12 + Math.random() * 0.76), y: state.canvasH * (0.12 + Math.random() * 0.76) });
+
+  // First blast at the drop point, then random extras
+  var nExtra = 2 + Math.floor(Math.random() * 2);
+  var blasts = [{x: dropX, y: dropY}];
+  for (var i = 0; i < nExtra; i++) {
+    blasts.push({x: state.canvasW * (0.1 + Math.random() * 0.8), y: state.canvasH * (0.1 + Math.random() * 0.8)});
   }
+
   var blastIdx = 0, fromX = dropX, fromY = dropY;
   var ufoX = dropX, ufoY = dropY;
-  var phase = 'moving', phaseT = performance.now();
+  // Start charging immediately — no "move to drop" phase needed
+  var phase = 'charging', phaseT = performance.now();
+
   ghostEl.style.transition = 'none';
+  ghostEl.style.opacity = '1';
+  ghostEl.style.left = (canvasRect.left + dropX) + 'px';
+  ghostEl.style.top  = (canvasRect.top  + dropY) + 'px';
+  ghostEl.style.transform = 'translate(-50%,-50%)';
+
+  // Shockwave rings and flash managed in the animation loop
+  var shockwaves = [];
+  var flashX = 0, flashY = 0, flashAlpha = 0, flashR = 0;
 
   function doBlast(cx, cy) {
-    var rays = 7 + Math.floor(Math.random() * 8);
-    var maxLen = 50 + Math.random() * 90;
+    var rays = 8 + Math.floor(Math.random() * 7);
+    var maxLen = 55 + Math.random() * 85;
     for (var i = 0; i < rays; i++) {
-      var angle = (i / rays) * Math.PI * 2 + Math.random() * 0.15;
-      var len = maxLen * (0.55 + Math.random() * 0.45);
-      var lw = 2.5 + Math.random() * 5;
+      var angle = (i / rays) * Math.PI * 2 + Math.random() * 0.2;
+      var len = maxLen * (0.6 + Math.random() * 0.4);
+      var lw = 3 + Math.random() * 5;
       var col = pickAlienColor();
       state.ctx.save();
       state.ctx.strokeStyle = col; state.ctx.lineWidth = lw; state.ctx.lineCap = 'round';
-      state.ctx.beginPath(); state.ctx.moveTo(cx, cy); state.ctx.lineTo(cx + Math.cos(angle) * len, cy + Math.sin(angle) * len); state.ctx.stroke();
+      state.ctx.shadowColor = col; state.ctx.shadowBlur = 7;
+      state.ctx.beginPath(); state.ctx.moveTo(cx, cy);
+      state.ctx.lineTo(cx + Math.cos(angle) * len, cy + Math.sin(angle) * len); state.ctx.stroke();
       state.ctx.fillStyle = col;
-      state.ctx.beginPath(); state.ctx.arc(cx + Math.cos(angle) * len, cy + Math.sin(angle) * len, lw * 0.7, 0, Math.PI * 2); state.ctx.fill();
+      state.ctx.beginPath(); state.ctx.arc(cx + Math.cos(angle) * len, cy + Math.sin(angle) * len, lw * 0.8, 0, Math.PI * 2); state.ctx.fill();
       state.ctx.restore();
     }
-    var cg = state.ctx.createRadialGradient(cx, cy, 0, cx, cy, maxLen * 0.18);
-    cg.addColorStop(0, 'rgba(255,255,255,0.9)'); cg.addColorStop(1, 'rgba(255,255,255,0)');
+    // Bright centre
+    var cg = state.ctx.createRadialGradient(cx, cy, 0, cx, cy, maxLen * 0.2);
+    cg.addColorStop(0, 'rgba(255,255,255,0.95)'); cg.addColorStop(1, 'rgba(255,255,255,0)');
     state.ctx.fillStyle = cg;
-    state.ctx.beginPath(); state.ctx.arc(cx, cy, maxLen * 0.18, 0, Math.PI * 2); state.ctx.fill();
-    state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
-    var fg = state.ovCtx.createRadialGradient(cx, cy, 0, cx, cy, maxLen * 0.45);
-    fg.addColorStop(0, 'rgba(255,255,255,0.75)'); fg.addColorStop(1, 'rgba(255,255,255,0)');
-    state.ovCtx.fillStyle = fg;
-    state.ovCtx.beginPath(); state.ovCtx.arc(cx, cy, maxLen * 0.45, 0, Math.PI * 2); state.ovCtx.fill();
-    setTimeout(function() { state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH); }, 100);
+    state.ctx.beginPath(); state.ctx.arc(cx, cy, maxLen * 0.2, 0, Math.PI * 2); state.ctx.fill();
+    // Queue shockwave + flash for the loop to animate
+    shockwaves.push({x: cx, y: cy, r: 4, maxR: maxLen * 0.8, alpha: 0.9, color: pickAlienColor()});
+    flashX = cx; flashY = cy; flashAlpha = 1; flashR = maxLen * 0.55;
   }
 
+  var lastT = performance.now();
   function frame() {
-    var now = performance.now(), elapsed = now - phaseT;
+    var now = performance.now();
+    var dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+    var elapsed = now - phaseT;
     var target = blasts[blastIdx];
+
+    // Decay shockwaves and flash each frame
+    for (var i = shockwaves.length - 1; i >= 0; i--) {
+      shockwaves[i].r += dt * 230; shockwaves[i].alpha -= dt * 2.8;
+      if (shockwaves[i].alpha <= 0) shockwaves.splice(i, 1);
+    }
+    flashAlpha = Math.max(0, flashAlpha - dt * 7);
+
+    state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
+
+    // Draw shockwaves
+    for (var i = 0; i < shockwaves.length; i++) {
+      var sw = shockwaves[i];
+      state.ovCtx.save();
+      state.ovCtx.globalAlpha = sw.alpha * 0.7;
+      state.ovCtx.strokeStyle = sw.color; state.ovCtx.lineWidth = 2.5;
+      state.ovCtx.beginPath(); state.ovCtx.arc(sw.x, sw.y, sw.r, 0, Math.PI * 2); state.ovCtx.stroke();
+      state.ovCtx.restore();
+    }
+    // Draw flash
+    if (flashAlpha > 0) {
+      var fg = state.ovCtx.createRadialGradient(flashX, flashY, 0, flashX, flashY, flashR);
+      fg.addColorStop(0, 'rgba(255,255,255,' + flashAlpha + ')');
+      fg.addColorStop(1, 'rgba(255,255,255,0)');
+      state.ovCtx.fillStyle = fg;
+      state.ovCtx.beginPath(); state.ovCtx.arc(flashX, flashY, flashR, 0, Math.PI * 2); state.ovCtx.fill();
+    }
+
     if (phase === 'moving') {
-      var t = Math.min(1, elapsed / 320);
+      var t = Math.min(1, elapsed / 350);
       var e = 1 - Math.pow(1 - t, 3);
       ufoX = fromX + (target.x - fromX) * e;
       ufoY = fromY + (target.y - fromY) * e;
@@ -741,115 +884,179 @@ function alienStarblast(dropX, dropY, ghostEl, onDone) {
       ghostEl.style.top  = (canvasRect.top  + ufoY) + 'px';
       ghostEl.style.transform = 'translate(-50%,-50%)';
       if (t >= 1) { ufoX = target.x; ufoY = target.y; phase = 'charging'; phaseT = now; }
+
     } else if (phase === 'charging') {
-      var t = Math.min(1, elapsed / 400);
-      var shakeX = t > 0.6 ? (Math.random() - 0.5) * t * 8 : 0;
-      var shakeY = t > 0.6 ? (Math.random() - 0.5) * t * 8 : 0;
+      var t = Math.min(1, elapsed / 520);
+      // Expanding concentric charge rings — 4 rings cycling continuously, growing with t
+      for (var r = 0; r < 4; r++) {
+        var ringT = (now * 0.003 + r * 0.25) % 1;
+        var rr = ringT * (20 + t * 25);
+        var ralpha = (1 - ringT) * 0.7 * t;
+        if (rr > 0.5 && ralpha > 0) {
+          state.ovCtx.save();
+          state.ovCtx.globalAlpha = ralpha;
+          state.ovCtx.strokeStyle = 'hsl(' + ((blastIdx * 90 + r * 60) % 360) + ',100%,70%)';
+          state.ovCtx.lineWidth = 2;
+          state.ovCtx.beginPath(); state.ovCtx.arc(ufoX, ufoY, rr, 0, Math.PI * 2); state.ovCtx.stroke();
+          state.ovCtx.restore();
+        }
+      }
+      var shakeX = t > 0.5 ? (Math.random() - 0.5) * t * 10 : 0;
+      var shakeY = t > 0.5 ? (Math.random() - 0.5) * t * 10 : 0;
       ghostEl.style.left = (canvasRect.left + ufoX + shakeX) + 'px';
       ghostEl.style.top  = (canvasRect.top  + ufoY + shakeY) + 'px';
-      ghostEl.style.transform = 'translate(-50%,-50%) scale(' + (1 + t * 0.18) + ')';
-      state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
-      var gr = state.ovCtx.createRadialGradient(ufoX, ufoY, 0, ufoX, ufoY, t * 40);
-      gr.addColorStop(0, 'rgba(255,255,200,0.7)'); gr.addColorStop(1, 'rgba(255,255,200,0)');
-      state.ovCtx.fillStyle = gr;
-      state.ovCtx.beginPath(); state.ovCtx.arc(ufoX, ufoY, t * 40, 0, Math.PI * 2); state.ovCtx.fill();
-      if (t >= 1) {
-        state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
-        doBlast(ufoX, ufoY);
-        phase = 'recovering'; phaseT = now;
-      }
+      ghostEl.style.transform = 'translate(-50%,-50%) scale(' + (1 + t * 0.22) + ')';
+      if (t >= 1) { doBlast(ufoX, ufoY); phase = 'recovering'; phaseT = now; }
+
     } else if (phase === 'recovering') {
-      var t = Math.min(1, elapsed / 200);
-      ghostEl.style.transform = 'translate(-50%,-50%) scale(' + (1 + (1 - t) * 0.25) + ')';
+      var t = Math.min(1, elapsed / 260);
+      ghostEl.style.left = (canvasRect.left + ufoX) + 'px';
+      ghostEl.style.top  = (canvasRect.top  + ufoY) + 'px';
+      ghostEl.style.transform = 'translate(-50%,-50%) scale(' + (1 + (1 - t) * 0.3) + ')';
       if (t >= 1) {
         blastIdx++;
         if (blastIdx >= blasts.length) { phase = 'leaving'; phaseT = now; }
         else { fromX = ufoX; fromY = ufoY; phase = 'moving'; phaseT = now; }
       }
+
     } else if (phase === 'leaving') {
-      var t = Math.min(1, elapsed / 380);
+      var t = Math.min(1, elapsed / 420);
       ghostEl.style.left = (canvasRect.left + ufoX) + 'px';
-      ghostEl.style.top  = (canvasRect.top  + ufoY - state.canvasH * 0.45 * t * t) + 'px';
-      ghostEl.style.opacity = String(1 - t);
-      if (t >= 1) { onDone(); return; }
+      ghostEl.style.top  = (canvasRect.top  + ufoY - state.canvasH * 0.5 * t * t) + 'px';
+      ghostEl.style.opacity = String(Math.max(0, 1 - t * 1.6));
+      if (t >= 1) { state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH); onDone(); return; }
     }
+
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 }
 
 // ---- Alien crop circles effect ----
+// UFO descends to hover above the drop point and slowly traces a glowing
+// geometric pattern — rings sweeping arc by arc, then spokes extending outward.
 
 function alienCropCircles(dropX, dropY, ghostEl, onDone) {
   saveHistory();
   state.lastStrokePoints = null;
   var canvasRect = state.canvasArea.getBoundingClientRect();
-  var cx = state.canvasW * (0.2 + Math.random() * 0.6);
-  var cy = state.canvasH * (0.2 + Math.random() * 0.6);
-  var maxR = Math.min(state.canvasW, state.canvasH) * (0.12 + Math.random() * 0.18);
+
+  var cx = dropX, cy = dropY;
+  var maxR = Math.min(state.canvasW, state.canvasH) * (0.12 + Math.random() * 0.15);
   var nRings = 3 + Math.floor(Math.random() * 3);
-  var nSpokes = 4 + Math.floor(Math.random() * 5);
-  var hoverY = cy - maxR - 30;
-  var phase = 'flying', phaseT = performance.now(), opsDrawn = 0;
+  var nSpokes = 4 + Math.floor(Math.random() * 4);
+  var hoverY = Math.max(12, cy - maxR - 35);
+  var startY = hoverY - 65;
+
+  // Pre-compute stable colors and widths
+  var ringColors = [], ringWidths = [], spokeColors = [], spokeWidths = [];
+  for (var i = 0; i < nRings; i++) { ringColors.push(pickAlienColor()); ringWidths.push(1.8 + Math.random() * 1.6); }
+  for (var i = 0; i < nSpokes; i++) { spokeColors.push(pickAlienColor()); spokeWidths.push(1.2 + Math.random() * 1.3); }
+  var dotColor = pickAlienColor();
+
+  var RING_DUR = 380, SPOKE_DUR = 160;
+  var totalDur = nRings * RING_DUR + nSpokes * SPOKE_DUR + 120;
+  var ringProgress = new Array(nRings).fill(0); // radians drawn per ring
+  var spokeProgress = new Array(nSpokes).fill(0); // 0..1 fraction drawn per spoke
+  var dotDrawn = false;
+  var cursorX = cx, cursorY = cy - maxR; // glowing draw cursor position
+
+  var phase = 'descend', phaseT = performance.now(), drawT = 0;
   ghostEl.style.transition = 'none';
+  ghostEl.style.opacity = '1';
+  ghostEl.style.left = (canvasRect.left + cx) + 'px';
+  ghostEl.style.top  = (canvasRect.top + startY) + 'px';
+  ghostEl.style.transform = 'translate(-50%,-50%) scale(0.72)';
 
-  var ops = [];
-  for (var i = nRings; i >= 1; i--) {
-    ops.push({ type: 'arc', cx: cx, cy: cy, r: maxR * (i / nRings), color: pickAlienColor(), lw: 1.5 + Math.random() * 2 });
-  }
-  for (var i = 0; i < nSpokes; i++) {
-    var ang = (i / nSpokes) * Math.PI * 2;
-    ops.push({ type: 'line',
-      x1: cx + Math.cos(ang) * maxR * 0.12, y1: cy + Math.sin(ang) * maxR * 0.12,
-      x2: cx + Math.cos(ang) * maxR,        y2: cy + Math.sin(ang) * maxR,
-      color: pickAlienColor(), lw: 1 + Math.random() * 1.5
-    });
-  }
-  ops.push({ type: 'dot', cx: cx, cy: cy, r: maxR * 0.08, color: pickAlienColor() });
+  function getRingR(i) { return maxR * ((nRings - i) / nRings); }
 
-  function drawOp(op) {
-    state.ctx.save();
-    if (op.type === 'arc') {
-      state.ctx.strokeStyle = op.color; state.ctx.lineWidth = op.lw;
-      state.ctx.shadowColor = op.color; state.ctx.shadowBlur = 5;
-      state.ctx.beginPath(); state.ctx.arc(op.cx, op.cy, op.r, 0, Math.PI * 2); state.ctx.stroke();
-    } else if (op.type === 'line') {
-      state.ctx.strokeStyle = op.color; state.ctx.lineWidth = op.lw;
-      state.ctx.shadowColor = op.color; state.ctx.shadowBlur = 4;
-      state.ctx.lineCap = 'round';
-      state.ctx.beginPath(); state.ctx.moveTo(op.x1, op.y1); state.ctx.lineTo(op.x2, op.y2); state.ctx.stroke();
-    } else if (op.type === 'dot') {
-      state.ctx.fillStyle = op.color;
-      state.ctx.shadowColor = op.color; state.ctx.shadowBlur = 8;
-      state.ctx.beginPath(); state.ctx.arc(op.cx, op.cy, op.r, 0, Math.PI * 2); state.ctx.fill();
+  function updateDrawing(drawElapsed) {
+    // Rings: outer to inner, each sweeps from 0 to 2π
+    for (var i = 0; i < nRings; i++) {
+      var rt = Math.max(0, Math.min(1, (drawElapsed - i * RING_DUR) / RING_DUR));
+      var targetAngle = rt * Math.PI * 2;
+      if (targetAngle > ringProgress[i]) {
+        var r = getRingR(i);
+        state.ctx.save();
+        state.ctx.strokeStyle = ringColors[i]; state.ctx.lineWidth = ringWidths[i];
+        state.ctx.shadowColor = ringColors[i]; state.ctx.shadowBlur = 8;
+        state.ctx.beginPath();
+        state.ctx.arc(cx, cy, r, ringProgress[i] - Math.PI / 2, targetAngle - Math.PI / 2);
+        state.ctx.stroke();
+        state.ctx.restore();
+        ringProgress[i] = targetAngle;
+        cursorX = cx + Math.cos(targetAngle - Math.PI / 2) * r;
+        cursorY = cy + Math.sin(targetAngle - Math.PI / 2) * r;
+      }
     }
-    state.ctx.restore();
+    // Spokes: extend outward one at a time
+    var spokesStart = nRings * RING_DUR;
+    for (var i = 0; i < nSpokes; i++) {
+      var st = Math.max(0, Math.min(1, (drawElapsed - spokesStart - i * SPOKE_DUR) / SPOKE_DUR));
+      if (st <= spokeProgress[i]) continue;
+      var ang = (i / nSpokes) * Math.PI * 2;
+      var innerR = maxR * 0.09, outerR = maxR;
+      state.ctx.save();
+      state.ctx.strokeStyle = spokeColors[i]; state.ctx.lineWidth = spokeWidths[i];
+      state.ctx.shadowColor = spokeColors[i]; state.ctx.shadowBlur = 5; state.ctx.lineCap = 'round';
+      state.ctx.beginPath();
+      state.ctx.moveTo(cx + Math.cos(ang) * (innerR + (outerR - innerR) * spokeProgress[i]),
+                       cy + Math.sin(ang) * (innerR + (outerR - innerR) * spokeProgress[i]));
+      state.ctx.lineTo(cx + Math.cos(ang) * (innerR + (outerR - innerR) * st),
+                       cy + Math.sin(ang) * (innerR + (outerR - innerR) * st));
+      state.ctx.stroke();
+      state.ctx.restore();
+      spokeProgress[i] = st;
+      cursorX = cx + Math.cos(ang) * (innerR + (outerR - innerR) * st);
+      cursorY = cy + Math.sin(ang) * (innerR + (outerR - innerR) * st);
+    }
+    // Centre dot
+    if (!dotDrawn && drawElapsed >= spokesStart + nSpokes * SPOKE_DUR) {
+      state.ctx.save();
+      state.ctx.fillStyle = dotColor; state.ctx.shadowColor = dotColor; state.ctx.shadowBlur = 12;
+      state.ctx.beginPath(); state.ctx.arc(cx, cy, maxR * 0.07, 0, Math.PI * 2); state.ctx.fill();
+      state.ctx.restore();
+      dotDrawn = true; cursorX = cx; cursorY = cy;
+    }
+  }
+
+  function drawCursor(now) {
+    state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
+    var pulse = 0.6 + Math.sin(now * 0.016) * 0.4;
+    var cg = state.ovCtx.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, 12);
+    cg.addColorStop(0, 'rgba(255,255,200,' + (pulse * 0.88) + ')');
+    cg.addColorStop(1, 'rgba(255,255,200,0)');
+    state.ovCtx.fillStyle = cg;
+    state.ovCtx.beginPath(); state.ovCtx.arc(cursorX, cursorY, 12, 0, Math.PI * 2); state.ovCtx.fill();
+    state.ovCtx.fillStyle = 'rgba(255,255,255,' + pulse + ')';
+    state.ovCtx.beginPath(); state.ovCtx.arc(cursorX, cursorY, 2.5, 0, Math.PI * 2); state.ovCtx.fill();
   }
 
   function frame() {
     var now = performance.now(), elapsed = now - phaseT;
-    if (phase === 'flying') {
-      var t = Math.min(1, elapsed / 650);
+
+    if (phase === 'descend') {
+      var t = Math.min(1, elapsed / 530);
       var e = 1 - Math.pow(1 - t, 3);
-      ghostEl.style.left = (canvasRect.left + dropX + (cx  - dropX) * e) + 'px';
-      ghostEl.style.top  = (canvasRect.top  + dropY + (hoverY - dropY) * e) + 'px';
-      ghostEl.style.transform = 'translate(-50%,-50%)';
-      if (t >= 1) { phase = 'drawing'; phaseT = now; }
+      ghostEl.style.top = (canvasRect.top + startY + (hoverY - startY) * e) + 'px';
+      ghostEl.style.transform = 'translate(-50%,-50%) scale(' + (0.72 + e * 0.28) + ')';
+      if (t >= 1) { phase = 'drawing'; phaseT = now; drawT = now; }
+
     } else if (phase === 'drawing') {
-      var t = Math.min(1, elapsed / 1200);
-      var target = Math.floor(t * ops.length);
-      while (opsDrawn < target) { drawOp(ops[opsDrawn]); opsDrawn++; }
-      ghostEl.style.left = (canvasRect.left + cx) + 'px';
-      ghostEl.style.top  = (canvasRect.top + hoverY + Math.sin(now * 0.004) * 5) + 'px';
-      ghostEl.style.transform = 'translate(-50%,-50%) scale(' + (1 + Math.sin(now * 0.008) * 0.04) + ')';
-      if (t >= 1) { phase = 'leaving'; phaseT = now; }
+      updateDrawing(now - drawT);
+      drawCursor(now);
+      ghostEl.style.top = (canvasRect.top + hoverY + Math.sin(now * 0.005) * 4) + 'px';
+      ghostEl.style.transform = 'translate(-50%,-50%) scale(' + (1 + Math.sin(now * 0.009) * 0.03) + ')';
+      if ((now - drawT) >= totalDur + 280) { phase = 'leaving'; phaseT = now; }
+
     } else if (phase === 'leaving') {
-      var t = Math.min(1, elapsed / 400);
-      ghostEl.style.left = (canvasRect.left + cx) + 'px';
-      ghostEl.style.top  = (canvasRect.top + hoverY - state.canvasH * 0.4 * t * t) + 'px';
-      ghostEl.style.opacity = String(1 - t);
+      state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
+      var t = Math.min(1, elapsed / 440);
+      ghostEl.style.top  = (canvasRect.top + hoverY - state.canvasH * 0.48 * t * t) + 'px';
+      ghostEl.style.opacity = String(Math.max(0, 1 - t * 1.65));
       if (t >= 1) { onDone(); return; }
     }
+
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
