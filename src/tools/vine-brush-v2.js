@@ -54,7 +54,7 @@ function drawLeaf(ctx, leaf) {
 
   mainPath();
   ctx.fillStyle = grad;
-  ctx.globalAlpha = baseAlpha * 0.92;
+  ctx.globalAlpha = baseAlpha;
   ctx.fill();
 
   // Inner highlight — smaller leaf offset to the lit side, gives volume without lines
@@ -141,6 +141,7 @@ export function drawVineStrokeV2(x, y, col) {
     var leafBase = Math.max(22, state.brushSize * 0.95);
     state.vineStrokeV2 = {
       lx: state.lastX, ly: state.lastY,
+      prevMidX: null, prevMidY: null, // for smooth quadratic stem
       dir: null,
       stemDist: 0,
       accumLeaf: 0,
@@ -179,32 +180,41 @@ export function drawVineStrokeV2(x, y, col) {
   if (snx + sny > 0) { snx = -snx; sny = -sny; }
   var off = stemW * 0.42;
 
+  // Midpoint-quadratic technique: arcs through midpoints give smooth joins
+  var midX = (st.lx + x) * 0.5, midY = (st.ly + y) * 0.5;
+  var hasPrev = st.prevMidX !== null;
+
+  function stemPath(ox, oy) {
+    state.ctx.beginPath();
+    if (hasPrev) {
+      state.ctx.moveTo(st.prevMidX + ox, st.prevMidY + oy);
+      state.ctx.quadraticCurveTo(st.lx + ox, st.ly + oy, midX + ox, midY + oy);
+    } else {
+      state.ctx.moveTo(st.lx + ox, st.ly + oy);
+      state.ctx.lineTo(midX + ox, midY + oy);
+    }
+  }
+
   state.ctx.save();
   state.ctx.lineCap = 'round';
   state.ctx.lineJoin = 'round';
 
   if (stemW > 2) {
-    state.ctx.beginPath();
-    state.ctx.moveTo(st.lx - snx * off, st.ly - sny * off);
-    state.ctx.lineTo(x   - snx * off, y   - sny * off);
+    stemPath(-snx * off, -sny * off);
     state.ctx.lineWidth   = stemW * 0.65;
     state.ctx.strokeStyle = st.stemDark;
     state.ctx.globalAlpha = 0.40;
     state.ctx.stroke();
   }
 
-  state.ctx.beginPath();
-  state.ctx.moveTo(st.lx, st.ly);
-  state.ctx.lineTo(x, y);
+  stemPath(0, 0);
   state.ctx.lineWidth   = stemW * wob;
   state.ctx.strokeStyle = col;
   state.ctx.globalAlpha = 1.0;
   state.ctx.stroke();
 
   if (stemW > 2.5) {
-    state.ctx.beginPath();
-    state.ctx.moveTo(st.lx + snx * off * 0.6, st.ly + sny * off * 0.6);
-    state.ctx.lineTo(x   + snx * off * 0.6, y   + sny * off * 0.6);
+    stemPath(snx * off * 0.6, sny * off * 0.6);
     state.ctx.lineWidth   = stemW * 0.38;
     state.ctx.strokeStyle = st.stemHi;
     state.ctx.globalAlpha = 0.42;
@@ -212,6 +222,8 @@ export function drawVineStrokeV2(x, y, col) {
   }
 
   state.ctx.restore();
+
+  st.prevMidX = midX; st.prevMidY = midY;
 
   st.lx = x; st.ly = y;
   st.stemDist  += d;
@@ -250,7 +262,7 @@ export function drawVineStrokeV2(x, y, col) {
       asym:      (Math.random() - 0.5) * 0.28, // subtle asymmetry only
       fillColor: leafCol,
       rimColor:  shadeColor(leafCol, -0.25, +8),
-      alpha:     0.82 + Math.random() * 0.14,
+      alpha:     1.0,
       born:      performance.now(),
       growDuration: GROW_DURATION + Math.random() * 80,
     });
