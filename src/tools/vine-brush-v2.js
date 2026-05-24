@@ -30,22 +30,29 @@ function drawLeaf(ctx, leaf) {
   var rhw = halfW * (1 - al); // right-side bulge
   var baseAlpha = ctx.globalAlpha;
 
+  // Two quadratic curves per edge: one to widen to peak, one to taper gently to tip.
+  // This lets the middle stay wide AND the tip arrive softly, no flat cap needed.
   function mainPath() {
-    var tipR = halfW * 0.18; // rounded tip cap radius
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    // Left edge to just before tip
-    ctx.bezierCurveTo(
-      dx * len * 0.10 - px * lhw * 0.55, dy * len * 0.10 - py * lhw * 0.55,
-      dx * len * pt   - px * lhw,         dy * len * pt   - py * lhw,
-      dx * len        - px * tipR,         dy * len        - py * tipR
+    // Left edge — base → peak (widens fast)
+    ctx.quadraticCurveTo(
+      dx * len * 0.08 - px * lhw * 0.90, dy * len * 0.08 - py * lhw * 0.90,
+      dx * len * pt   - px * lhw,         dy * len * pt   - py * lhw
     );
-    // Soft round cap over the tip
-    ctx.quadraticCurveTo(dx * len, dy * len, dx * len + px * tipR, dy * len + py * tipR);
-    // Right edge back to base
-    ctx.bezierCurveTo(
-      dx * len * pt   + px * rhw,          dy * len * pt   + py * rhw,
-      dx * len * 0.10 + px * rhw * 0.55,  dy * len * 0.10 + py * rhw * 0.55,
+    // Left edge — peak → tip (tapers gently, control point nearly on axis)
+    ctx.quadraticCurveTo(
+      dx * len * 0.80 - px * lhw * 0.06, dy * len * 0.80 - py * lhw * 0.06,
+      dx * len,                           dy * len
+    );
+    // Right edge — tip → peak (expands gently from tip)
+    ctx.quadraticCurveTo(
+      dx * len * 0.80 + px * rhw * 0.06, dy * len * 0.80 + py * rhw * 0.06,
+      dx * len * pt   + px * rhw,         dy * len * pt   + py * rhw
+    );
+    // Right edge — peak → base (closes fast)
+    ctx.quadraticCurveTo(
+      dx * len * 0.08 + px * rhw * 0.90, dy * len * 0.08 + py * rhw * 0.90,
       0, 0
     );
     ctx.closePath();
@@ -62,20 +69,26 @@ function drawLeaf(ctx, leaf) {
   ctx.globalAlpha = baseAlpha;
   ctx.fill();
 
-  // Inner highlight — smaller leaf offset to the lit side, gives volume without lines
+  // Inner highlight — same two-quad shape, smaller + offset to lit side
   function hiPath() {
-    var hl = len * 0.64, hhw = halfW * 0.38;
+    var hl = len * 0.62, hhw = halfW * 0.36;
     var hox = px * halfW * 0.20, hoy = py * halfW * 0.20;
     ctx.beginPath();
     ctx.moveTo(hox, hoy);
-    ctx.bezierCurveTo(
-      hox + dx * hl * 0.10 - px * hhw * 0.55, hoy + dy * hl * 0.10 - py * hhw * 0.55,
-      hox + dx * hl * pt   - px * hhw,         hoy + dy * hl * pt   - py * hhw,
+    ctx.quadraticCurveTo(
+      hox + dx * hl * 0.08 - px * hhw * 0.90, hoy + dy * hl * 0.08 - py * hhw * 0.90,
+      hox + dx * hl * pt   - px * hhw,          hoy + dy * hl * pt   - py * hhw
+    );
+    ctx.quadraticCurveTo(
+      hox + dx * hl * 0.80 - px * hhw * 0.06, hoy + dy * hl * 0.80 - py * hhw * 0.06,
       hox + dx * hl,                            hoy + dy * hl
     );
-    ctx.bezierCurveTo(
-      hox + dx * hl * pt   + px * hhw,         hoy + dy * hl * pt   + py * hhw,
-      hox + dx * hl * 0.10 + px * hhw * 0.55,  hoy + dy * hl * 0.10 + py * hhw * 0.55,
+    ctx.quadraticCurveTo(
+      hox + dx * hl * 0.80 + px * hhw * 0.06, hoy + dy * hl * 0.80 + py * hhw * 0.06,
+      hox + dx * hl * pt   + px * hhw,          hoy + dy * hl * pt   + py * hhw
+    );
+    ctx.quadraticCurveTo(
+      hox + dx * hl * 0.08 + px * hhw * 0.90, hoy + dy * hl * 0.08 + py * hhw * 0.90,
       hox, hoy
     );
     ctx.closePath();
@@ -198,6 +211,13 @@ export function drawVineStrokeV2(x, y, col) {
   state.ctx.save();
   state.ctx.lineCap = 'round';
   state.ctx.lineJoin = 'round';
+  // Shadow: wider stroke at same centerline — dark peeks out equally on all sides, no ribbing
+  stemPath(0, 0);
+  state.ctx.lineWidth   = stemW * wob * 1.45;
+  state.ctx.strokeStyle = st.stemDark;
+  state.ctx.globalAlpha = 0.32;
+  state.ctx.stroke();
+  // Main stem on top
   stemPath(0, 0);
   state.ctx.lineWidth   = stemW * wob;
   state.ctx.strokeStyle = col;
