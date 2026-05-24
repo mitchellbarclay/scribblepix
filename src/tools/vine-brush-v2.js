@@ -161,47 +161,54 @@ export function drawVineStrokeV2(x, y, col) {
   // Stem — direct to main canvas
   var stemW = Math.max(2, state.brushSize * 0.38);
   var wob   = 1 + 0.14 * Math.sin(st.stemDist * 0.020 + st.phase);
-  // Perpendicular to stroke direction — for the cross-sectional gradient
-  var tdx = d > 0 ? ddx / d : (st.dir ? st.dir[0] : 1);
-  var tdy = d > 0 ? ddy / d : (st.dir ? st.dir[1] : 0);
-  var perp_x = -tdy, perp_y = tdx;
-  var hw = stemW * wob * 0.5;
-  var mx = (st.lx + x) * 0.5, my = (st.ly + y) * 0.5;
+  var fullW = stemW * wob;
 
   // Midpoint-quadratic technique: arcs through midpoints give smooth joins
   var midX = (st.lx + x) * 0.5, midY = (st.ly + y) * 0.5;
   var hasPrev = st.prevMidX !== null;
 
-  function stemPath(ox, oy) {
+  function stemPath() {
     state.ctx.beginPath();
     if (hasPrev) {
-      state.ctx.moveTo(st.prevMidX + ox, st.prevMidY + oy);
-      state.ctx.quadraticCurveTo(st.lx + ox, st.ly + oy, midX + ox, midY + oy);
+      state.ctx.moveTo(st.prevMidX, st.prevMidY);
+      state.ctx.quadraticCurveTo(st.lx, st.ly, midX, midY);
     } else {
-      state.ctx.moveTo(st.lx + ox, st.ly + oy);
-      state.ctx.lineTo(midX + ox, midY + oy);
+      state.ctx.moveTo(st.lx, st.ly);
+      state.ctx.lineTo(midX, midY);
     }
   }
-
-  // Gradient perpendicular to stroke: dark edges, lighter centre — looks cylindrical
-  var stemGrad = state.ctx.createLinearGradient(
-    mx - perp_x * hw, my - perp_y * hw,
-    mx + perp_x * hw, my + perp_y * hw
-  );
-  stemGrad.addColorStop(0.00, st.stemDark);
-  stemGrad.addColorStop(0.30, col);
-  stemGrad.addColorStop(0.55, st.stemHi);
-  stemGrad.addColorStop(0.80, col);
-  stemGrad.addColorStop(1.00, st.stemDark);
 
   state.ctx.save();
   state.ctx.lineCap = 'round';
   state.ctx.lineJoin = 'round';
-  stemPath(0, 0);
-  state.ctx.lineWidth   = stemW * wob;
-  state.ctx.strokeStyle = stemGrad;
+
+  // Base pass — flat colour
+  stemPath();
+  state.ctx.lineWidth = fullW;
+  state.ctx.strokeStyle = col;
   state.ctx.globalAlpha = 1.0;
   state.ctx.stroke();
+
+  // Concentric highlight passes — each narrower stroke sits inside the previous,
+  // so the stacked opacity creates a bell-curve glow without any blur bleed risk
+  stemPath();
+  state.ctx.lineWidth = fullW * 0.65;
+  state.ctx.strokeStyle = st.stemHi;
+  state.ctx.globalAlpha = 0.22;
+  state.ctx.stroke();
+
+  stemPath();
+  state.ctx.lineWidth = fullW * 0.38;
+  state.ctx.strokeStyle = st.stemHi;
+  state.ctx.globalAlpha = 0.40;
+  state.ctx.stroke();
+
+  stemPath();
+  state.ctx.lineWidth = fullW * 0.18;
+  state.ctx.strokeStyle = st.stemHi;
+  state.ctx.globalAlpha = 0.55;
+  state.ctx.stroke();
+
   state.ctx.restore();
 
   st.prevMidX = midX; st.prevMidY = midY;
