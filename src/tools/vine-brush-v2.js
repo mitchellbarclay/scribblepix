@@ -31,13 +31,18 @@ function drawLeaf(ctx, leaf) {
   var baseAlpha = ctx.globalAlpha;
 
   function mainPath() {
+    var tipR = halfW * 0.18; // rounded tip cap radius
     ctx.beginPath();
     ctx.moveTo(0, 0);
+    // Left edge to just before tip
     ctx.bezierCurveTo(
       dx * len * 0.10 - px * lhw * 0.55, dy * len * 0.10 - py * lhw * 0.55,
       dx * len * pt   - px * lhw,         dy * len * pt   - py * lhw,
-      dx * len,                            dy * len
+      dx * len        - px * tipR,         dy * len        - py * tipR
     );
+    // Soft round cap over the tip
+    ctx.quadraticCurveTo(dx * len, dy * len, dx * len + px * tipR, dy * len + py * tipR);
+    // Right edge back to base
     ctx.bezierCurveTo(
       dx * len * pt   + px * rhw,          dy * len * pt   + py * rhw,
       dx * len * 0.10 + px * rhw * 0.55,  dy * len * 0.10 + py * rhw * 0.55,
@@ -174,11 +179,6 @@ export function drawVineStrokeV2(x, y, col) {
   // Original stamps with radius brushSize*0.20, so effective diameter ≈ brushSize*0.40
   var stemW = Math.max(2, state.brushSize * 0.38);
   var wob   = 1 + 0.14 * Math.sin(st.stemDist * 0.020 + st.phase);
-  var tdx = d > 0 ? ddx / d : (st.dir ? st.dir[0] : 1);
-  var tdy = d > 0 ? ddy / d : (st.dir ? st.dir[1] : 0);
-  var snx = -tdy, sny = tdx;
-  if (snx + sny > 0) { snx = -snx; sny = -sny; }
-  var off = stemW * 0.42;
 
   // Midpoint-quadratic technique: arcs through midpoints give smooth joins
   var midX = (st.lx + x) * 0.5, midY = (st.ly + y) * 0.5;
@@ -198,29 +198,11 @@ export function drawVineStrokeV2(x, y, col) {
   state.ctx.save();
   state.ctx.lineCap = 'round';
   state.ctx.lineJoin = 'round';
-
-  if (stemW > 2) {
-    stemPath(-snx * off, -sny * off);
-    state.ctx.lineWidth   = stemW * 0.65;
-    state.ctx.strokeStyle = st.stemDark;
-    state.ctx.globalAlpha = 0.40;
-    state.ctx.stroke();
-  }
-
   stemPath(0, 0);
   state.ctx.lineWidth   = stemW * wob;
   state.ctx.strokeStyle = col;
   state.ctx.globalAlpha = 1.0;
   state.ctx.stroke();
-
-  if (stemW > 2.5) {
-    stemPath(snx * off * 0.6, sny * off * 0.6);
-    state.ctx.lineWidth   = stemW * 0.38;
-    state.ctx.strokeStyle = st.stemHi;
-    state.ctx.globalAlpha = 0.42;
-    state.ctx.stroke();
-  }
-
   state.ctx.restore();
 
   st.prevMidX = midX; st.prevMidY = midY;
