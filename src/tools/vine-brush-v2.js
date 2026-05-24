@@ -160,8 +160,7 @@ export function drawVineStrokeV2(x, y, col) {
 
   // Stem — direct to main canvas
   var stemW = Math.max(2, state.brushSize * 0.38);
-  var wob   = 1 + 0.14 * Math.sin(st.stemDist * 0.020 + st.phase);
-  var fullW = stemW * wob;
+  var fullW = stemW;
 
   // Midpoint-quadratic technique: arcs through midpoints give smooth joins
   var midX = (st.lx + x) * 0.5, midY = (st.ly + y) * 0.5;
@@ -178,37 +177,22 @@ export function drawVineStrokeV2(x, y, col) {
     }
   }
 
+  // Fixed world-space gradient: always lit from top, regardless of stroke direction.
+  // Single opaque stroke — no per-segment alpha stacking, no rib artifacts, no crinkle.
+  var hw = fullW * 0.5;
+  var stemGrad = state.ctx.createLinearGradient(midX, midY - hw, midX, midY + hw);
+  stemGrad.addColorStop(0.00, st.stemHi);
+  stemGrad.addColorStop(0.35, col);
+  stemGrad.addColorStop(1.00, st.stemDark);
+
   state.ctx.save();
   state.ctx.lineCap = 'round';
   state.ctx.lineJoin = 'round';
-
-  // Base pass — flat colour
   stemPath();
-  state.ctx.lineWidth = fullW;
-  state.ctx.strokeStyle = col;
+  state.ctx.lineWidth   = fullW;
+  state.ctx.strokeStyle = stemGrad;
   state.ctx.globalAlpha = 1.0;
   state.ctx.stroke();
-
-  // Concentric highlight passes — each narrower stroke sits inside the previous,
-  // so the stacked opacity creates a bell-curve glow without any blur bleed risk
-  stemPath();
-  state.ctx.lineWidth = fullW * 0.65;
-  state.ctx.strokeStyle = st.stemHi;
-  state.ctx.globalAlpha = 0.22;
-  state.ctx.stroke();
-
-  stemPath();
-  state.ctx.lineWidth = fullW * 0.38;
-  state.ctx.strokeStyle = st.stemHi;
-  state.ctx.globalAlpha = 0.40;
-  state.ctx.stroke();
-
-  stemPath();
-  state.ctx.lineWidth = fullW * 0.18;
-  state.ctx.strokeStyle = st.stemHi;
-  state.ctx.globalAlpha = 0.55;
-  state.ctx.stroke();
-
   state.ctx.restore();
 
   st.prevMidX = midX; st.prevMidY = midY;
