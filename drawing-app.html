@@ -19,9 +19,9 @@ body { background: linear-gradient(135deg, var(--bg-c1) 0%, var(--bg-c2) 50%, va
 #tool-pill { background: transparent; display: flex; flex-direction: column; gap: 5px; align-items: center; flex: 1 1 0; min-height: 0; width: 100%; }
 #tool-scroll-viewport { flex: 1 1 0; min-height: 0; overflow: hidden; width: 100%; display: flex; flex-direction: column; align-items: center; padding: 6px 0; }
 #tool-list { display: flex; flex-direction: column; gap: 14px; align-items: center; padding: 2px 0; will-change: transform; }
-.tool-overflow-btn { width: 32px; height: 0; overflow: hidden; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.45); background: rgba(255,255,255,0.28); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; flex-shrink: 0; transition: height 0.22s cubic-bezier(0.34,1.56,0.64,1), opacity 0.18s ease; color: rgba(255,255,255,0.95); box-shadow: 0 2px 6px rgba(0,0,0,0.22); }
+.tool-overflow-btn { width: 32px; height: 0; overflow: hidden; border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.10); background: rgba(255,255,255,0.72); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; flex-shrink: 0; transition: height 0.22s cubic-bezier(0.34,1.56,0.64,1), opacity 0.18s ease; color: rgba(30,60,70,0.80); box-shadow: 0 2px 6px rgba(0,0,0,0.18); }
 .tool-overflow-btn.visible { height: 32px; opacity: 1; pointer-events: auto; }
-.tool-overflow-btn:hover { background: rgba(255,255,255,0.42); }
+.tool-overflow-btn:hover { background: rgba(255,255,255,0.90); color: rgba(30,60,70,1); }
 .tool-overflow-btn:active { transform: scale(0.88); }
 .tool-overflow-btn .mir { font-size: 20px; }
 .tool-btn { width: 46px; height: 46px; border-radius: 50%; background: transparent; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; transition: background 0.15s, transform 0.18s cubic-bezier(0.34,1.56,0.64,1); flex-shrink: 0; user-select: none; }
