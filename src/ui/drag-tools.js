@@ -99,6 +99,7 @@ function makeUndoTool() {
       artboard: 'Undo',
       stateMachines: 'State Machine 1',
       autoplay: true,
+      layout: new window.rive.Layout({ fit: window.rive.Fit.Contain, alignment: window.rive.Alignment.Center }),
       onLoad: function() {
         var vm = r.viewModelByName('DragToolsVM');
         if (vm) {
