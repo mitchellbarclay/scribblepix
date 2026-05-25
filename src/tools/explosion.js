@@ -1,154 +1,123 @@
 import state from '../state.js';
-import { parseColorRgb } from '../core/color-utils.js';
-import { stampDot, getBrushStamp } from '../core/brush-pipeline.js';
 import { saveHistory } from '../core/history.js';
 
-function makeNoiseSeed() {
-  return [Math.random()*6.2832, Math.random()*6.2832, Math.random()*6.2832];
-}
-
-function noiseRadius(theta, seed, amp) {
-  return 1 + amp*0.55*Math.sin(theta*3+seed[0])
-           + amp*0.30*Math.sin(theta*5+seed[1])
-           + amp*0.18*Math.sin(theta*9+seed[2]);
-}
-
-function buildNoiseTable(seed, amp, bins) {
-  bins = bins || 1024;
-  var arr = new Float32Array(bins);
-  for (var i = 0; i < bins; i++) arr[i] = noiseRadius((i/bins)*6.2832, seed, amp);
-  return arr;
-}
-
-function buildJaggedBlobStamp(baseR, css, seed, amp) {
-  baseR = Math.max(2, Math.round(baseR));
-  var maxR = Math.ceil(baseR*(1+amp));
-  var size = 2*maxR+1;
-  var sc = document.createElement('canvas'); sc.width = size; sc.height = size;
-  var sctx = sc.getContext('2d');
-  var img = sctx.createImageData(size,size), d = img.data;
-  var rgb = parseColorRgb(css);
-  var bins = 512, rByBin = new Float32Array(bins);
-  for (var k = 0; k < bins; k++) {
-    var theta = (k/bins)*6.2832 - Math.PI;
-    rByBin[k] = baseR*noiseRadius(theta, seed, amp);
-  }
-  for (var y = 0; y < size; y++) {
-    var dy = y-maxR, dyy = dy*dy;
-    for (var x = 0; x < size; x++) {
-      var dx = x-maxR;
-      var theta = Math.atan2(dy,dx);
-      var bin = ((theta+Math.PI)/6.2832*bins)|0;
-      if (bin < 0) bin = 0; else if (bin >= bins) bin = bins-1;
-      var rr = rByBin[bin];
-      if (dx*dx+dyy <= rr*rr) {
-        var idx = (y*size+x)*4;
-        d[idx] = rgb[0]; d[idx+1] = rgb[1]; d[idx+2] = rgb[2]; d[idx+3] = 255;
+// Sutherland-Hodgman polygon clip against a convex clip polygon (CW in screen coords)
+function clipPolyToConvex(poly, clip) {
+  var output = poly.slice();
+  var n = clip.length;
+  for (var i = 0; i < n; i++) {
+    if (output.length === 0) return [];
+    var input = output;
+    output = [];
+    var eA = clip[i], eB = clip[(i+1) % n];
+    for (var j = 0; j < input.length; j++) {
+      var curr = input[j];
+      var prev = input[(j + input.length - 1) % input.length];
+      var currIn = (eB.x-eA.x)*(curr.y-eA.y) - (eB.y-eA.y)*(curr.x-eA.x) >= 0;
+      var prevIn = (eB.x-eA.x)*(prev.y-eA.y) - (eB.y-eA.y)*(prev.x-eA.x) >= 0;
+      if (currIn) {
+        if (!prevIn) output.push(edgeIntersect(eA, eB, prev, curr));
+        output.push(curr);
+      } else if (prevIn) {
+        output.push(edgeIntersect(eA, eB, prev, curr));
       }
     }
   }
-  sctx.putImageData(img,0,0);
-  return sc;
+  return output;
 }
 
-function strokeJaggedRing(targetCtx, cx, cy, r, thickness, css, alpha, table) {
-  if (r <= 0 || thickness <= 0) return;
-  var rgb = parseColorRgb(css);
-  targetCtx.fillStyle = 'rgb('+rgb[0]+','+rgb[1]+','+rgb[2]+')';
-  targetCtx.globalAlpha = alpha;
-  var icx = Math.round(cx), icy = Math.round(cy);
-  var t = Math.max(1, Math.round(thickness));
-  var bins = table.length, binsOver2pi = bins/6.2832;
-  var step = 1/Math.max(r,1);
-  for (var k = 0; k < t; k++) {
-    var rr = r-k; if (rr <= 0) break;
-    for (var a = 0; a < 6.2832; a += step) {
-      var bin = (a*binsOver2pi)|0;
-      if (bin >= bins) bin = bins-1;
-      var nr = rr*table[bin];
-      var px = icx+Math.round(Math.cos(a)*nr);
-      var py = icy+Math.round(Math.sin(a)*nr);
-      targetCtx.fillRect(px,py,1,1);
-    }
+function edgeIntersect(a, b, c, d) {
+  var denom = (a.x-b.x)*(c.y-d.y) - (a.y-b.y)*(c.x-d.x);
+  if (Math.abs(denom) < 1e-10) return {x:(c.x+d.x)/2, y:(c.y+d.y)/2};
+  var t = ((a.x-c.x)*(c.y-d.y) - (a.y-c.y)*(c.x-d.x)) / denom;
+  return {x: a.x + t*(b.x-a.x), y: a.y + t*(b.y-a.y)};
+}
+
+function makeCirclePoly(cx, cy, r) {
+  var pts = [], n = 48;
+  for (var i = 0; i < n; i++) {
+    var a = (i / n) * Math.PI * 2;
+    pts.push({x: cx + Math.cos(a)*r, y: cy + Math.sin(a)*r});
   }
-  targetCtx.globalAlpha = 1;
+  return pts;
 }
 
 export function doBoom(cx, cy) {
   saveHistory();
   state.lastStrokePoints = null;
-  var baseR = 200+Math.random()*60;
-  var fragCount = 44+Math.floor(Math.random()*16);
-  var clearR = baseR*0.32;
-  var frags = [];
+  var baseR = 200 + Math.random()*60;
 
-  for (var i = 0; i < fragCount; i++) {
-    var a = Math.random()*6.2832;
-    var r = clearR+Math.sqrt(Math.random())*(baseR*0.9-clearR);
-    var fcx = cx+Math.cos(a)*r, fcy = cy+Math.sin(a)*r;
-    var nv = 4+Math.floor(Math.random()*5);
-    var angs = [];
-    for (var j = 0; j < nv; j++) angs.push(Math.random()*6.2832);
-    angs.sort(function(a,b){return a-b;});
-    var fR = baseR*(0.07+Math.random()*0.12);
-    var verts = [];
-    for (var j = 0; j < angs.length; j++) {
-      var vr = fR*(0.5+Math.random()*0.7);
-      verts.push({x:fcx+Math.cos(angs[j])*vr, y:fcy+Math.sin(angs[j])*vr});
+  // Jittered grid tessellation over blast area
+  var cols = 8, rows = 8;
+  var cellW = baseR*2/cols, cellH = baseR*2/rows;
+  var jitter = cellW*0.38;
+
+  var gridPts = [];
+  for (var row = 0; row <= rows; row++) {
+    for (var col = 0; col <= cols; col++) {
+      var bx = cx - baseR + col*cellW;
+      var by = cy - baseR + row*cellH;
+      var jx = (col > 0 && col < cols) ? (Math.random()-0.5)*2*jitter : 0;
+      var jy = (row > 0 && row < rows) ? (Math.random()-0.5)*2*jitter : 0;
+      gridPts.push({x: bx+jx, y: by+jy});
     }
-    var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-    for (var j = 0; j < verts.length; j++) {
-      if (verts[j].x < minX) minX=verts[j].x; if (verts[j].y < minY) minY=verts[j].y;
-      if (verts[j].x > maxX) maxX=verts[j].x; if (verts[j].y > maxY) maxY=verts[j].y;
+  }
+  function gpt(r, c) { return gridPts[r*(cols+1)+c]; }
+
+  var circlePoly = makeCirclePoly(cx, cy, baseR);
+
+  // Clip each grid quad to blast circle → fragment polygons
+  var frags = [];
+  for (var row = 0; row < rows; row++) {
+    for (var col = 0; col < cols; col++) {
+      var quad = [gpt(row,col), gpt(row,col+1), gpt(row+1,col+1), gpt(row+1,col)];
+      var verts = clipPolyToConvex(quad, circlePoly);
+      if (!verts || verts.length < 3) continue;
+      var fcx = 0, fcy = 0;
+      for (var k = 0; k < verts.length; k++) { fcx += verts[k].x; fcy += verts[k].y; }
+      fcx /= verts.length; fcy /= verts.length;
+      var dx = fcx-cx, dy = fcy-cy, dist = Math.sqrt(dx*dx+dy*dy) || 1;
+      var spd = 2 + (dist/baseR)*6 + Math.random()*2;
+      frags.push({
+        verts: verts, cx: fcx, cy: fcy,
+        vx: (dx/dist)*spd + (Math.random()-0.5)*1.5,
+        vy: (dy/dist)*spd + (Math.random()-0.5)*1.5,
+        rot: 0, rotSpeed: (Math.random()-0.5)*0.05,
+        x: 0, y: 0, frame: 0, maxFrame: 20+Math.floor(Math.random()*20), done: false,
+        img: null, minX: 0, minY: 0, fw: 0, fh: 0
+      });
     }
-    minX = Math.max(0,Math.floor(minX)); minY = Math.max(0,Math.floor(minY));
-    maxX = Math.min(state.canvasW,Math.ceil(maxX)); maxY = Math.min(state.canvasH,Math.ceil(maxY));
-    var fw = maxX-minX, fh = maxY-minY;
-    if (fw < 2 || fh < 2) continue;
-    var dx = fcx-cx, dy = fcy-cy, dist = Math.sqrt(dx*dx+dy*dy)||1;
-    var spd = 1.8+(dist/baseR)*5+Math.random()*2.5;
-    frags.push({
-      verts:verts, cx:fcx, cy:fcy, minX:minX, minY:minY, fw:fw, fh:fh, x:0, y:0,
-      vx:(dx/dist)*spd+(Math.random()-0.5)*1.5,
-      vy:(dy/dist)*spd+(Math.random()-0.5)*1.5,
-      rot:0, rotSpeed:(Math.random()-0.5)*0.06,
-      frame:0, maxFrame:22+Math.floor(Math.random()*20), done:false
-    });
   }
 
+  // Capture canvas pixels for each fragment
   for (var i = 0; i < frags.length; i++) {
     var f = frags[i];
-    var pw = f.fw*state.DPR, ph = f.fh*state.DPR;
-    var fc = document.createElement('canvas'); fc.width = pw; fc.height = ph;
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (var j = 0; j < f.verts.length; j++) {
+      if (f.verts[j].x < minX) minX = f.verts[j].x;
+      if (f.verts[j].y < minY) minY = f.verts[j].y;
+      if (f.verts[j].x > maxX) maxX = f.verts[j].x;
+      if (f.verts[j].y > maxY) maxY = f.verts[j].y;
+    }
+    minX = Math.max(0, Math.floor(minX)); minY = Math.max(0, Math.floor(minY));
+    maxX = Math.min(state.canvasW, Math.ceil(maxX)); maxY = Math.min(state.canvasH, Math.ceil(maxY));
+    var fw = maxX-minX, fh = maxY-minY;
+    if (fw < 1 || fh < 1) { f.img = null; continue; }
+    f.minX = minX; f.minY = minY; f.fw = fw; f.fh = fh;
+
+    var fc = document.createElement('canvas');
+    fc.width = fw*state.DPR; fc.height = fh*state.DPR;
     var fctx = fc.getContext('2d');
     fctx.beginPath();
-    fctx.moveTo((f.verts[0].x-f.minX)*state.DPR,(f.verts[0].y-f.minY)*state.DPR);
+    fctx.moveTo((f.verts[0].x-minX)*state.DPR, (f.verts[0].y-minY)*state.DPR);
     for (var j = 1; j < f.verts.length; j++)
-      fctx.lineTo((f.verts[j].x-f.minX)*state.DPR,(f.verts[j].y-f.minY)*state.DPR);
+      fctx.lineTo((f.verts[j].x-minX)*state.DPR, (f.verts[j].y-minY)*state.DPR);
     fctx.closePath(); fctx.clip();
-    fctx.drawImage(state.canvas,-f.minX*state.DPR,-f.minY*state.DPR);
-
-    var imgData = fctx.getImageData(0,0,pw,ph);
-    var src = imgData.data;
-    var out = new Uint8ClampedArray(src);
-    var bsz = 2, nbx = Math.floor(pw/bsz), nby = Math.floor(ph/bsz);
-    var swaps = Math.floor(nbx*nby*0.12);
-    for (var s = 0; s < swaps; s++) {
-      var ax = Math.floor(Math.random()*nbx)*bsz, ay = Math.floor(Math.random()*nby)*bsz;
-      if (out[(ay*pw+ax)*4+3]===0) continue;
-      var nx = ax+(Math.floor(Math.random()*9)-4)*bsz, ny = ay+(Math.floor(Math.random()*9)-4)*bsz;
-      nx = Math.max(0,Math.min((nbx-1)*bsz,nx)); ny = Math.max(0,Math.min((nby-1)*bsz,ny));
-      if (out[(ny*pw+nx)*4+3]===0) continue;
-      for (var by = 0; by < bsz; by++) for (var bx3 = 0; bx3 < bsz; bx3++) {
-        var ai = ((ay+by)*pw+(ax+bx3))*4, bi = ((ny+by)*pw+(nx+bx3))*4;
-        for (var c = 0; c < 4; c++) { var tmp=out[ai+c]; out[ai+c]=out[bi+c]; out[bi+c]=tmp; }
-      }
-    }
-    fctx.putImageData(new ImageData(out,pw,ph),0,0);
+    fctx.drawImage(state.canvas, -minX*state.DPR, -minY*state.DPR);
     f.img = fc;
   }
 
-  // Clear each fragment's source polygon so the displacement creates the space
+  // Clear blast area — each fragment polygon fills with background, no separate blob
   state.ctx.save();
   state.ctx.fillStyle = state.BG_CSS;
   for (var i = 0; i < frags.length; i++) {
@@ -161,42 +130,37 @@ export function doBoom(cx, cy) {
     state.ctx.fill();
   }
   state.ctx.restore();
-  // Clear center void — no fragments originate here
-  var craterStamp = buildJaggedBlobStamp(clearR*1.2, state.BG_CSS, makeNoiseSeed(), 0.20);
-  state.ctx.save(); stampDot(state.ctx, cx, cy, craterStamp); state.ctx.restore();
 
+  // Animate fragments flying outward
   var frame = 0;
   function animBoom() {
-    state.ovCtx.clearRect(0,0,state.canvasW,state.canvasH);
+    state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
     var alive = false;
     for (var i = 0; i < frags.length; i++) {
       var f = frags[i];
       if (!f.img || f.done) continue;
       f.vx *= 0.88; f.vy *= 0.88;
       f.x += f.vx; f.y += f.vy; f.rot += f.rotSpeed; f.frame++;
-      if (f.frame%3===0) {
-        var tdx = f.cx+f.x-cx, tdy = f.cy+f.y-cy;
-        if (tdx*tdx+tdy*tdy > clearR*clearR) {
-          state.ctx.save(); state.ctx.globalAlpha = 0.13;
-          state.ctx.translate(f.cx+f.x,f.cy+f.y); state.ctx.rotate(f.rot);
-          state.ctx.drawImage(f.img,-(f.cx-f.minX),-(f.cy-f.minY),f.fw,f.fh);
-          state.ctx.restore();
-        }
+      if (f.frame%3 === 0) {
+        state.ctx.save(); state.ctx.globalAlpha = 0.10;
+        state.ctx.translate(f.cx+f.x, f.cy+f.y); state.ctx.rotate(f.rot);
+        state.ctx.drawImage(f.img, -(f.cx-f.minX), -(f.cy-f.minY), f.fw, f.fh);
+        state.ctx.restore();
       }
       state.ovCtx.save();
-      state.ovCtx.translate(f.cx+f.x,f.cy+f.y); state.ovCtx.rotate(f.rot);
-      state.ovCtx.drawImage(f.img,-(f.cx-f.minX),-(f.cy-f.minY),f.fw,f.fh);
+      state.ovCtx.translate(f.cx+f.x, f.cy+f.y); state.ovCtx.rotate(f.rot);
+      state.ovCtx.drawImage(f.img, -(f.cx-f.minX), -(f.cy-f.minY), f.fw, f.fh);
       state.ovCtx.restore();
       if (f.frame >= f.maxFrame) {
         f.done = true;
         state.ctx.save();
-        state.ctx.translate(f.cx+f.x,f.cy+f.y); state.ctx.rotate(f.rot);
-        state.ctx.drawImage(f.img,-(f.cx-f.minX),-(f.cy-f.minY),f.fw,f.fh);
+        state.ctx.translate(f.cx+f.x, f.cy+f.y); state.ctx.rotate(f.rot);
+        state.ctx.drawImage(f.img, -(f.cx-f.minX), -(f.cy-f.minY), f.fw, f.fh);
         state.ctx.restore();
       } else { alive = true; }
     }
     if (alive && ++frame < 120) requestAnimationFrame(animBoom);
-    else state.ovCtx.clearRect(0,0,state.canvasW,state.canvasH);
+    else state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
   }
   animBoom();
 }
