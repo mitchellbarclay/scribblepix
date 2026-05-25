@@ -130,19 +130,7 @@ export function doBoom(cx, cy) {
 
     var imgData = fctx.getImageData(0,0,pw,ph);
     var src = imgData.data;
-    var out = new Uint8ClampedArray(src.length);
-    var caShift = 2+Math.floor(Math.random()*3);
-    for (var y = 0; y < ph; y++) {
-      for (var x = 0; x < pw; x++) {
-        var di = (y*pw+x)*4;
-        if (src[di+3]===0){out[di+3]=0;continue;}
-        var rx = Math.max(0,x-caShift), bx2 = Math.min(pw-1,x+caShift);
-        out[di]   = src[(y*pw+rx)*4];
-        out[di+1] = src[di+1];
-        out[di+2] = src[(y*pw+bx2)*4+2];
-        out[di+3] = src[di+3];
-      }
-    }
+    var out = new Uint8ClampedArray(src);
     var bsz = 2, nbx = Math.floor(pw/bsz), nby = Math.floor(ph/bsz);
     var swaps = Math.floor(nbx*nby*0.12);
     for (var s = 0; s < swaps; s++) {
@@ -160,8 +148,22 @@ export function doBoom(cx, cy) {
     f.img = fc;
   }
 
-  var craterStamp = buildJaggedBlobStamp(baseR*0.88, state.BG_CSS, makeNoiseSeed(), 0.22);
-  state.ctx.save(); stampDot(state.ctx,cx,cy,craterStamp); state.ctx.restore();
+  // Clear each fragment's source polygon so the displacement creates the space
+  state.ctx.save();
+  state.ctx.fillStyle = state.BG_CSS;
+  for (var i = 0; i < frags.length; i++) {
+    var f = frags[i];
+    if (!f.img) continue;
+    state.ctx.beginPath();
+    state.ctx.moveTo(f.verts[0].x, f.verts[0].y);
+    for (var j = 1; j < f.verts.length; j++) state.ctx.lineTo(f.verts[j].x, f.verts[j].y);
+    state.ctx.closePath();
+    state.ctx.fill();
+  }
+  state.ctx.restore();
+  // Clear center void — no fragments originate here
+  var craterStamp = buildJaggedBlobStamp(clearR*1.2, state.BG_CSS, makeNoiseSeed(), 0.20);
+  state.ctx.save(); stampDot(state.ctx, cx, cy, craterStamp); state.ctx.restore();
 
   var frame = 0;
   function animBoom() {
