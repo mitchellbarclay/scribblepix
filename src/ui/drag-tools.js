@@ -7,20 +7,14 @@ import { doBoom } from '../tools/explosion.js';
 
 // ---- Undo tool ----
 
-function setUndoEmoji(e) {
-  var undoBtn = document.getElementById('undo-btn');
-  var icon = undoBtn.querySelector('.drag-item-icon');
-  if (!icon) return;
-  var img = icon.querySelector('img');
-  var src = (e === '😮') ? 'custom-icons/drag icons/undo_oops.svg' : 'custom-icons/drag icons/undo_yikes.svg';
-  if (img) img.src = src;
-}
-
 var undoBusy = false;
+var undoTriggerInput = null;
+
 function fireUndo() {
-  if (undoBusy || !state.undoSnapshot) { setUndoEmoji('😬'); return; }
-  if (state.undoSnapshot.width !== state.canvas.width || state.undoSnapshot.height !== state.canvas.height) { setUndoEmoji('😬'); return; }
+  if (undoBusy || !state.undoSnapshot) { return; }
+  if (state.undoSnapshot.width !== state.canvas.width || state.undoSnapshot.height !== state.canvas.height) { return; }
   undoBusy = true;
+  if (undoTriggerInput) undoTriggerInput.trigger();
 
   var pts = state.lastStrokePoints;
   var snap = document.createElement('canvas');
@@ -82,13 +76,12 @@ function fireUndo() {
       else {
         state.ovCtx.clearRect(0, 0, snapCSSW, snapCSSH);
         commit();
-        setTimeout(function() { setUndoEmoji('😬'); undoBusy = false; }, 180);
+        setTimeout(function() { undoBusy = false; }, 180);
       }
     } catch(err) {
       console.error('undo frame error:', err);
       commit();
       undoBusy = false;
-      setUndoEmoji('😬');
     }
   }
   frame();
@@ -98,6 +91,24 @@ function makeUndoTool() {
   var btn = document.getElementById('undo-btn');
   var iconEl = btn.querySelector('.drag-item-icon');
   var pressed = false, startX = 0, startY = 0;
+
+  if (window.rive) {
+    var r = new window.rive.Rive({
+      src: 'src/rive/drag_tools.riv',
+      canvas: document.getElementById('undo-canvas'),
+      artboard: 'Undo',
+      stateMachines: 'State Machine 1',
+      autoplay: true,
+      onLoad: function() {
+        var vm = r.viewModelByName('DragToolsVM');
+        if (vm) {
+          var inst = vm.defaultInstance();
+          r.bindViewModelInstance(inst);
+          undoTriggerInput = inst.trigger('undo');
+        }
+      }
+    });
+  }
 
   function applyStretch(dx, dy) {
     var dist = Math.hypot(dx, dy);
@@ -130,7 +141,7 @@ function makeUndoTool() {
     fireUndo();
   }
 
-  function startDrag(cx, cy) { pressed = true; startX = cx; startY = cy; iconEl.style.transition = ''; setUndoEmoji('😮'); }
+  function startDrag(cx, cy) { pressed = true; startX = cx; startY = cy; iconEl.style.transition = ''; }
   function moveDrag(cx, cy) { if (!pressed) return; applyStretch(cx-startX, cy-startY); }
   function endDrag() { if (!pressed) return; pressed = false; recoilAndFire(); }
 
