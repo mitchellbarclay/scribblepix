@@ -48,7 +48,7 @@ export function doBoom(cx, cy) {
   var baseR = 440 + Math.random()*80;
 
   // Jittered grid tessellation over blast area
-  var cols = 13, rows = 13;
+  var cols = 20, rows = 20;
   var cellW = baseR*2/cols, cellH = baseR*2/rows;
   var jitter = cellW*0.38;
 
@@ -117,18 +117,12 @@ export function doBoom(cx, cy) {
     f.img = fc;
   }
 
-  // Clear blast area — each fragment polygon fills with background, no separate blob
+  // Clear blast area as a clean circle — per-polygon fills leave seam artifacts at edges
   state.ctx.save();
+  state.ctx.beginPath();
+  state.ctx.arc(cx, cy, baseR, 0, Math.PI*2);
   state.ctx.fillStyle = state.BG_CSS;
-  for (var i = 0; i < frags.length; i++) {
-    var f = frags[i];
-    if (!f.img) continue;
-    state.ctx.beginPath();
-    state.ctx.moveTo(f.verts[0].x, f.verts[0].y);
-    for (var j = 1; j < f.verts.length; j++) state.ctx.lineTo(f.verts[j].x, f.verts[j].y);
-    state.ctx.closePath();
-    state.ctx.fill();
-  }
+  state.ctx.fill();
   state.ctx.restore();
 
   // Animate fragments flying outward
