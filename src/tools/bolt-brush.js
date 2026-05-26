@@ -30,9 +30,20 @@ function drawBoltPath(targetCtx, pts, col, lineWidth, alpha) {
 }
 
 function strokeBoltGlow(targetCtx, pts, col, w) {
+  // Outer halo — wide spread for electric atmosphere
   targetCtx.save();
-  targetCtx.shadowColor = col; targetCtx.shadowBlur = state.brushSize * 2.0;
+  targetCtx.shadowColor = col; targetCtx.shadowBlur = state.brushSize * 5.0;
   targetCtx.strokeStyle = col; targetCtx.lineWidth = w;
+  targetCtx.lineCap = 'round'; targetCtx.lineJoin = 'round';
+  targetCtx.globalAlpha = 0.28;
+  targetCtx.beginPath(); targetCtx.moveTo(pts[0].x, pts[0].y);
+  for (var i = 1; i < pts.length; i++) targetCtx.lineTo(pts[i].x, pts[i].y);
+  targetCtx.stroke(); targetCtx.restore();
+
+  // Inner glow — tight, bright core halo
+  targetCtx.save();
+  targetCtx.shadowColor = col; targetCtx.shadowBlur = state.brushSize * 1.6;
+  targetCtx.strokeStyle = col; targetCtx.lineWidth = w * 0.8;
   targetCtx.lineCap = 'round'; targetCtx.lineJoin = 'round';
   targetCtx.globalAlpha = 1.0;
   targetCtx.beginPath(); targetCtx.moveTo(pts[0].x, pts[0].y);
@@ -47,7 +58,7 @@ function bakeBolt(x0, y0, x1, y1, col) {
   var pts = fractalBolt(x0, y0, x1, y1, depth, len*0.72, null);
   var w = Math.max(2, state.brushSize*0.70);
   strokeBoltGlow(state.ctx, pts, col, w);
-  drawBoltPath(state.ctx, pts, '#fff', Math.max(1,w*0.35), 0.90);
+  drawBoltPath(state.ctx, pts, '#fff', Math.max(1,w*0.40), 0.95);
 }
 
 function boltMakeParam(bs) {
@@ -84,7 +95,7 @@ function drawBoltParam(targetCtx, param, ax, ay, x1, y1, col) {
   var pts = boltParamToAbsFixed(param, ax, ay, x1, y1);
   var w = Math.max(2, state.brushSize*0.70);
   strokeBoltGlow(targetCtx, pts, col, w);
-  drawBoltPath(targetCtx, pts, '#fff', Math.max(1,w*0.35), 0.90);
+  drawBoltPath(targetCtx, pts, '#fff', Math.max(1,w*0.40), 0.95);
 }
 
 function boltCurrentParam() {
@@ -186,7 +197,7 @@ export function drawBoltStroke(x, y, col) {
       var finalPts = boltParamToAbsFixed(toParam, bs.anchorX, bs.anchorY, x, y);
       var w = Math.max(2, state.brushSize*0.70);
       strokeBoltGlow(state.ctx, finalPts, col, w);
-      drawBoltPath(state.ctx, finalPts, '#fff', Math.max(1,w*0.35), 0.90);
+      drawBoltPath(state.ctx, finalPts, '#fff', Math.max(1,w*0.40), 0.95);
     } else {
       bakeBolt(bs.anchorX, bs.anchorY, x, y, col);
     }
