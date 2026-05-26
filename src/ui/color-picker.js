@@ -7,6 +7,7 @@ var colorDragging = false;
 var colorGrabY = 0;
 var colorCachedTrackTop = 0, colorCachedMaxTop = 0, colorCachedHandleH = 0;
 var colorRafScheduled = false, colorPendingY = 0;
+var colorP = 0.5;
 
 function cacheColorRects() {
   var tr = colorTrack.getBoundingClientRect();
@@ -49,11 +50,11 @@ function applyColorHandleTop(topPx) {
   var maxTop = colorCachedMaxTop > 0 ? colorCachedMaxTop : (colorTrack.clientHeight - colorHandle.offsetHeight);
   topPx = Math.max(0, Math.min(maxTop, topPx));
   colorHandle.style.top = topPx + 'px';
-  var p = maxTop > 0 ? topPx/maxTop : 0;
-  var rgb = colorAtPos(p);
+  colorP = maxTop > 0 ? topPx/maxTop : 0;
+  var rgb = colorAtPos(colorP);
   state.color = rgbToHex(rgb);
   colorHandle.style.background = state.color;
-  updateBackground(p);
+  updateBackground(colorP);
   updateBrushPreview();
 }
 
@@ -135,8 +136,6 @@ export function initColorPicker() {
     cacheColorRects();
     var maxTop = colorCachedMaxTop;
     if (maxTop <= 0) { applyColorHandleTop(0); return; }
-    var currentTop = parseFloat(colorHandle.style.top);
-    if (isNaN(currentTop)) currentTop = maxTop * 0.5;
-    applyColorHandleTop(Math.min(currentTop, maxTop));
+    applyColorHandleTop(colorP * maxTop);
   }); }).observe(colorTrack);
 }
