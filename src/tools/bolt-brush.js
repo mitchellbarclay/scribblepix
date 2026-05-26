@@ -30,22 +30,12 @@ function drawBoltPath(targetCtx, pts, col, lineWidth, alpha) {
 }
 
 function strokeBoltGlow(targetCtx, pts, col, w) {
-  // Outer halo — wide spread for electric atmosphere
+  var blurPx = Math.max(2, state.brushSize * 0.35);
   targetCtx.save();
-  targetCtx.shadowColor = col; targetCtx.shadowBlur = state.brushSize * 5.0;
-  targetCtx.strokeStyle = col; targetCtx.lineWidth = w;
+  targetCtx.filter = 'blur(' + blurPx + 'px)';
+  targetCtx.strokeStyle = col; targetCtx.lineWidth = w * 1.4;
   targetCtx.lineCap = 'round'; targetCtx.lineJoin = 'round';
-  targetCtx.globalAlpha = 0.28;
-  targetCtx.beginPath(); targetCtx.moveTo(pts[0].x, pts[0].y);
-  for (var i = 1; i < pts.length; i++) targetCtx.lineTo(pts[i].x, pts[i].y);
-  targetCtx.stroke(); targetCtx.restore();
-
-  // Inner glow — tight, bright core halo
-  targetCtx.save();
-  targetCtx.shadowColor = col; targetCtx.shadowBlur = state.brushSize * 1.6;
-  targetCtx.strokeStyle = col; targetCtx.lineWidth = w * 0.8;
-  targetCtx.lineCap = 'round'; targetCtx.lineJoin = 'round';
-  targetCtx.globalAlpha = 1.0;
+  targetCtx.globalAlpha = 0.9;
   targetCtx.beginPath(); targetCtx.moveTo(pts[0].x, pts[0].y);
   for (var i = 1; i < pts.length; i++) targetCtx.lineTo(pts[i].x, pts[i].y);
   targetCtx.stroke(); targetCtx.restore();
