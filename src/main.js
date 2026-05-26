@@ -15,6 +15,7 @@ import { initToolbar, hideRectSubmenu, hideEllipseSubmenu } from './ui/toolbar.j
 import { initToolbarOverflow } from './ui/toolbar-overflow.js';
 import { initDragTools } from './ui/drag-tools.js';
 import { initDock } from './ui/dock.js';
+import { warmupTools } from './tools/prewarm.js';
 
 // Init DOM refs into state
 state.canvas = document.getElementById('c');
@@ -133,3 +134,9 @@ initToolbar();
 initToolbarOverflow();
 initDragTools();
 initDock();
+
+if (window.requestIdleCallback) {
+  requestIdleCallback(warmupTools, { timeout: 2000 });
+} else {
+  setTimeout(warmupTools, 50);
+}
