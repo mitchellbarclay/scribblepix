@@ -98,6 +98,8 @@ export function drawFlowerStroke(x, y, col) {
       flowerBase: flowerBase,
       nextSpacing: flowerBase * (0.85 + Math.random() * 0.45),
     };
+    // Spawn one flower immediately on press so short taps produce something
+    spawnBlossom(state.lastX, state.lastY, col, state.flowerStroke);
   }
 
   var st = state.flowerStroke;
@@ -123,31 +125,30 @@ export function drawFlowerStroke(x, y, col) {
   while (st.accumDist >= st.nextSpacing && st.dir) {
     st.accumDist -= st.nextSpacing;
     st.nextSpacing = st.flowerBase * (0.85 + Math.random() * 0.45);
+    spawnBlossom(x, y, col, st);
+  }
+}
 
-    var nPetals    = 5 + Math.floor(Math.random() * 3); // 5, 6, or 7
-    var petalLen   = st.flowerBase * (0.65 + Math.random() * 0.50);
-    var petalHw    = petalLen * (0.30 + Math.random() * 0.14);
-    var centerR    = petalLen * 0.24;
-    var petalColor = adjacentColor(col, 22);
-    var centerColor = shadeColor(col, +0.28, +52); // warm, shifted toward yellow
+function spawnBlossom(x, y, col, st) {
+  var petalLen   = st.flowerBase * (0.65 + Math.random() * 0.50);
+  var petalHw    = petalLen * (0.30 + Math.random() * 0.14);
 
-    state.flowerLiveBlossoms.push({
-      cx: x, cy: y,
-      nPetals:     nPetals,
-      len:         petalLen,
-      hw:          petalHw,
-      centerR:     centerR,
-      baseAngle:   Math.random() * Math.PI * 2,
-      petalColor:  petalColor,
-      centerColor: centerColor,
-      alpha:       1.0,
-      born:        performance.now(),
-      growDuration: GROW_DURATION + Math.random() * 90,
-    });
+  state.flowerLiveBlossoms.push({
+    cx: x, cy: y,
+    nPetals:     5 + Math.floor(Math.random() * 3),
+    len:         petalLen,
+    hw:          petalHw,
+    centerR:     petalLen * 0.24,
+    baseAngle:   Math.random() * Math.PI * 2,
+    petalColor:  adjacentColor(col, 22),
+    centerColor: shadeColor(col, +0.28, +52),
+    alpha:       1.0,
+    born:        performance.now(),
+    growDuration: GROW_DURATION + Math.random() * 90,
+  });
 
-    if (!state.flowerAnimFrame) {
-      state.flowerAnimFrame = requestAnimationFrame(flowerOverlayFrame);
-    }
+  if (!state.flowerAnimFrame) {
+    state.flowerAnimFrame = requestAnimationFrame(flowerOverlayFrame);
   }
 }
 
