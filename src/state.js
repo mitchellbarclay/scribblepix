@@ -90,6 +90,12 @@ const state = {
   pipeAnimFrame: null,
   mirrorPipeStroke: null,
 
+  // Flower
+  flowerStroke: null,
+  mirrorFlowerStroke: null,
+  flowerLiveBlossoms: [],
+  flowerAnimFrame: null,
+
   // Fire
   fireDistAcc: 0,
   fireVelX: 0,

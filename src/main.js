@@ -4,6 +4,7 @@ import { saveHistory } from './core/history.js';
 import { drawStroke, getPos } from './tools/draw-stroke.js';
 import { commitAllSplatterParticles } from './tools/bubble-brush.js';
 import { finalizeVineStrokeV2 } from './tools/vine-brush-v2.js';
+import { finalizeFlowerStroke } from './tools/flower-brush.js';
 import { finalizeBoltStroke } from './tools/bolt-brush.js';
 import { finalizeFireStroke } from './tools/fire-brush.js';
 import { finalizeRectStroke, cancelRectStroke } from './tools/rect-tool.js';
@@ -47,6 +48,7 @@ state.canvas.addEventListener('mousedown', function(e) {
   var pos = getPos(e), x = pos[0], y = pos[1];
   saveHistory();
   state.mirrorVineStrokeV2 = null;
+  state.mirrorFlowerStroke = null;
   state.mirrorBoltStroke = null; state.mirrorBoltPtsA = null; state.mirrorBoltPtsB = null; state.mirrorBoltCommits = [];
   state.mirrorPipeStroke = null;
   state.lastStrokePoints = [{x:x, y:y}];
@@ -56,6 +58,7 @@ state.canvas.addEventListener('mousedown', function(e) {
                          : state.tool === 'fire' ? state.brushSize*7.5
                          : state.tool === 'bolt' ? state.brushSize*2.2
                          : state.tool === 'vine' ? state.brushSize*1.6
+                         : state.tool === 'flower' ? state.brushSize*1.8
                          : state.tool === 'pipe' ? state.brushSize*1.8
                          : state.tool === 'rect' ? 0
                          : state.tool === 'ellipse' ? 0
@@ -81,14 +84,14 @@ state.canvas.addEventListener('mousemove', function(e) {
 
 state.canvas.addEventListener('mouseup', function() {
   state.painting = false;
-  finalizeVineStrokeV2(); finalizeBoltStroke(); finalizeFireStroke();
+  finalizeVineStrokeV2(); finalizeFlowerStroke(); finalizeBoltStroke(); finalizeFireStroke();
   finalizeRectStroke(); finalizeEllipseStroke(); finalizePipeStroke();
   clearBrushPreview();
 });
 
 state.canvas.addEventListener('mouseleave', function() {
   state.painting = false;
-  finalizeVineStrokeV2(); finalizeBoltStroke(); finalizeFireStroke();
+  finalizeVineStrokeV2(); finalizeFlowerStroke(); finalizeBoltStroke(); finalizeFireStroke();
   cancelRectStroke(); cancelEllipseStroke(); finalizePipeStroke();
   clearBrushPreview();
 });
