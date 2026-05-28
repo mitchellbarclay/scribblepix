@@ -2,7 +2,7 @@ import state from '../state.js';
 import { hslToRgb, hexToRgb } from '../core/color-utils.js';
 import { getBrushStamp, stampDot } from '../core/brush-pipeline.js';
 import { saveHistory } from '../core/history.js';
-import { bucketPour } from '../core/fill.js';
+import { progressiveFloodFill } from '../core/fill.js';
 import { doBoom } from '../tools/explosion.js';
 
 // ---- Undo tool ----
@@ -147,6 +147,117 @@ function makeUndoTool() {
   function endDrag() { if (!pressed) return; pressed = false; recoilAndFire(); }
 
   btn.addEventListener('mousedown', function(e) { e.preventDefault(); startDrag(e.clientX, e.clientY); });
+  btn.addEventListener('touchstart', function(e) { e.preventDefault(); startDrag(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+
+  return {move: moveDrag, end: endDrag};
+}
+
+// ---- Fill bucket tool ----
+
+function makeBucketTool() {
+  var btn = document.getElementById('bucket-btn');
+  var locked = false, pressed = false;
+  var cursorX = 0, cursorY = 0;
+  var dragXInput = null, dragYInput = null, fillTriggerInput = null;
+  var riveRef = null;
+  var artboardW = 500; // updated after Rive loads
+  var pendingFill = null; // {x, y} in canvas CSS coords
+
+  if (window.rive) {
+    riveRef = new window.rive.Rive({
+      src: 'src/rive/drag_tools.riv',
+      canvas: document.getElementById('bucket-canvas'),
+      artboard: 'Fill bucket',
+      stateMachines: 'State Machine 1',
+      autoplay: true,
+      layout: new window.rive.Layout({ fit: window.rive.Fit.Contain, alignment: window.rive.Alignment.Center }),
+      onLoad: function() {
+        try { if (riveRef.artboard) artboardW = riveRef.artboard.width || artboardW; } catch(e) {}
+        var vm = riveRef.viewModelByName('DragToolsVM');
+        if (vm) {
+          var inst = vm.defaultInstance();
+          riveRef.bindViewModelInstance(inst);
+          dragXInput = inst.number('dragX');
+          dragYInput = inst.number('dragY');
+          fillTriggerInput = inst.trigger('fill');
+        }
+        // Also listen for a RiveEvent named 'fill' in case it's a state machine event
+        riveRef.on(window.rive.EventType.RiveEvent, function(evt) {
+          if (evt.data && evt.data.name === 'fill' && pendingFill) {
+            doFillAt(pendingFill.x, pendingFill.y);
+          }
+        });
+      }
+    });
+  }
+
+  function doFillAt(cx, cy) {
+    if (!pendingFill) return;
+    pendingFill = null;
+    locked = false;
+    var fc = state.rainbowMode ? 'hsl('+Math.floor(Math.random()*360)+',100%,50%)' : state.color;
+    var rgb = fc.indexOf('hsl') === 0 ? hslToRgb(fc) : hexToRgb(fc);
+    progressiveFloodFill(Math.round(cx * state.DPR), Math.round(cy * state.DPR), rgb, function() {});
+  }
+
+  // Poll the ViewModel trigger value each frame — Rive sets it true for one frame when fired
+  var pollDeadline = 0;
+  function pollFill() {
+    if (!pendingFill) return;
+    if (fillTriggerInput && fillTriggerInput.value) {
+      doFillAt(pendingFill.x, pendingFill.y); return;
+    }
+    if (performance.now() < pollDeadline) { requestAnimationFrame(pollFill); return; }
+    // Timed out — do the fill anyway so the action is never silently lost
+    if (pendingFill) doFillAt(pendingFill.x, pendingFill.y);
+  }
+
+  // Pass drag offset (screen px from button centre) into the ViewModel
+  function updateRiveDrag(cx, cy) {
+    if (!dragXInput || !dragYInput) return;
+    var r = btn.getBoundingClientRect();
+    // Scale screen-pixel offset to Rive artboard coordinates
+    var scale = artboardW / 62;
+    dragXInput.value  = (cx - (r.left + r.width  / 2)) * scale;
+    dragYInput.value  = (cy - (r.top  + r.height / 2)) * scale;
+  }
+
+  function startDrag(cx, cy) {
+    if (locked) return;
+    locked = true; pressed = true;
+    cursorX = cx; cursorY = cy;
+    updateRiveDrag(cx, cy);
+  }
+
+  function moveDrag(cx, cy) {
+    if (!pressed) return;
+    cursorX = cx; cursorY = cy;
+    updateRiveDrag(cx, cy);
+  }
+
+  function endDrag(cx, cy) {
+    if (!pressed) return;
+    pressed = false;
+    cursorX = cx; cursorY = cy;
+    updateRiveDrag(cx, cy);
+
+    var cr = state.canvasArea.getBoundingClientRect();
+    var canvasX = cx - cr.left, canvasY = cy - cr.top;
+    var inCanvas = canvasX >= 0 && canvasX <= state.canvasW && canvasY >= 0 && canvasY <= state.canvasH;
+
+    if (inCanvas) {
+      saveHistory();
+      state.lastStrokePoints = null;
+      pendingFill = { x: canvasX, y: canvasY };
+      pollDeadline = performance.now() + 5000; // 5 s timeout
+      requestAnimationFrame(pollFill);
+    } else {
+      // Rive handles recoil — just release lock after animation
+      setTimeout(function() { locked = false; }, 700);
+    }
+  }
+
+  btn.addEventListener('mousedown',  function(e) { e.preventDefault(); startDrag(e.clientX, e.clientY); });
   btn.addEventListener('touchstart', function(e) { e.preventDefault(); startDrag(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
 
   return {move: moveDrag, end: endDrag};
@@ -1194,13 +1305,7 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
 
 export function initDragTools() {
   var undoTool = makeUndoTool();
-  var bucketTool = makeDragTool('bucket-btn', function(x, y, ghostEl) {
-    return new Promise(function(resolve) {
-      saveHistory();
-      state.lastStrokePoints = null;
-      bucketPour(Math.round(x), Math.round(y), ghostEl, resolve);
-    });
-  });
+  var bucketTool = makeBucketTool();
   var dynamiteTool = makeDragTool('dynamite-btn', function(x, y, ghostEl) {
     return new Promise(function(resolve) { dynamitePlace(x, y, ghostEl, resolve); });
   });
