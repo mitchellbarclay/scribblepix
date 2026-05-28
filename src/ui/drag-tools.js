@@ -652,14 +652,30 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
   // Beam points directly at where the user dropped
   var beamX = dropX;
   var beamBotY = dropY;
-  var beamHalfW = 40 + Math.random() * 50;
+  var beamHalfW = 55 + Math.random() * 55;
   var beamLen = Math.min(dropY - 5, 140 + Math.random() * 120);
   var hoverY = Math.max(8, dropY - beamLen);
   var startY = hoverY - 70;
   var beamHue = Math.floor(Math.random() * 360);
 
+  // Build all beam targets — first is the drop point, then 1–2 more
+  var nExtra = 1 + Math.floor(Math.random() * 2);
+  var allTargets = [{ x: beamX, botY: beamBotY, hoverY: hoverY, halfW: beamHalfW }];
+  for (var _ek = 0; _ek < nExtra; _ek++) {
+    var _tBotY = state.canvasH * 0.18 + Math.random() * state.canvasH * 0.64;
+    var _tLen  = Math.min(_tBotY - 5, 110 + Math.random() * 130);
+    allTargets.push({
+      x:      state.canvasW * 0.1 + Math.random() * state.canvasW * 0.8,
+      botY:   _tBotY,
+      hoverY: Math.max(8, _tBotY - _tLen),
+      halfW:  50 + Math.random() * 55
+    });
+  }
+  var targetIdx = 0;
+
   var phase = 'descend', phaseT = performance.now();
-  var beamExtent = 0, invertDone = false;
+  var beamSubPhase = 'extending', beamSubPhaseT = 0, subGlitchFired = false;
+  var beamExtent = 0;
   var particles = [], particleTimer = 0;
 
   ghostEl.style.transition = 'none';
@@ -737,109 +753,14 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
     var topY = hoverY + 10, botY = beamBotY, topW = 5, botW = beamHalfW;
     var DPR = state.DPR;
 
-    // 1. Gradient blobs — paint hazy plasma along the beam before scrambling.
-    //    On a white/empty canvas these are the primary visual; on coloured art
-    //    they add a tinted layer that the jitter then distorts.
-    var nBlobs = 2 + Math.floor(Math.random() * 2);
-    for (var b = 0; b < nBlobs; b++) {
-      var blobT = 0.12 + Math.random() * 0.76;
-      var beamHwB = topW + (botW - topW) * blobT;
-      var blobX = beamX + (Math.random() - 0.5) * beamHwB * 1.6;
-      var blobY = topY + (botY - topY) * blobT;
-      var blobR = 38 + Math.random() * 60;
-      var blobHue = (beamHue + (Math.random() - 0.5) * 55 + 360) % 360;
-      var bg = state.ctx.createRadialGradient(blobX, blobY, 0, blobX, blobY, blobR);
-      bg.addColorStop(0,   'hsla(' + blobHue + ',100%,68%,0.55)');
-      bg.addColorStop(0.5, 'hsla(' + blobHue + ',90%,62%,0.28)');
-      bg.addColorStop(1,   'hsla(' + blobHue + ',80%,60%,0)');
-      state.ctx.fillStyle = bg;
-      state.ctx.beginPath();
-      state.ctx.arc(blobX, blobY, blobR, 0, Math.PI * 2);
-      state.ctx.fill();
-    }
-
-    // 2. Row jitter across two overlapping vertical bands for wider coverage
-    var bands = [
-      [topY, topY + (botY - topY) * 0.62],
-      [topY + (botY - topY) * 0.35, botY]
-    ];
-    for (var bz = 0; bz < 2; bz++) {
-      var bzy0 = Math.max(0, Math.floor(bands[bz][0] * DPR));
-      var bzy1 = Math.min(state.canvas.height, Math.ceil(bands[bz][1] * DPR));
-      var bzx0 = Math.max(0, Math.floor((beamX - botW - 6) * DPR));
-      var bzx1 = Math.min(state.canvas.width,  Math.ceil((beamX + botW + 6) * DPR));
-      var pw = bzx1 - bzx0, ph = bzy1 - bzy0;
-      if (pw <= 0 || ph <= 0) continue;
-      var id = state.ctx.getImageData(bzx0, bzy0, pw, ph);
-      var src = new Uint8ClampedArray(id.data);
-      var d = id.data;
-      for (var row = 0; row < ph; row++) {
-        var cssY = (row + bzy0) / DPR;
-        var tRow = (cssY - topY) / (botY - topY);
-        if (tRow < 0 || tRow > 1) continue;
-        var hw = (topW + (botW - topW) * tRow) * DPR;
-        var cx = beamX * DPR - bzx0;
-        var lx = Math.max(0, Math.round(cx - hw));
-        var rx = Math.min(pw, Math.round(cx + hw));
-        var maxJitter = Math.round(16 * tRow + 3);
-        var jitter = Math.round((Math.random() * 2 - 1) * maxJitter);
-        for (var col = lx; col < rx; col++) {
-          var sc = Math.min(Math.max(lx, col + jitter), rx - 1);
-          var di = (row * pw + col) * 4;
-          var si = (row * pw + sc) * 4;
-          d[di] = src[si]; d[di+1] = src[si+1]; d[di+2] = src[si+2];
-        }
-      }
-      state.ctx.putImageData(id, bzx0, bzy0);
-    }
-
-    // 3. Wavy energy bands — replace hard horizontal lines with sin-curve paths
-    var nBands = 5 + Math.floor(Math.random() * 5);
-    for (var i = 0; i < nBands; i++) {
-      var ly = topY + Math.random() * (botY - topY);
-      var lt = (ly - topY) / (botY - topY);
-      var lhw = topW + (botW - topW) * lt;
-      var span = 0.5 + Math.random() * 0.5;
-      var lx0 = beamX - lhw * span + (Math.random() - 0.5) * lhw * 0.2;
-      var lx1 = beamX + lhw * span + (Math.random() - 0.5) * lhw * 0.2;
-      var alpha = 0.45 + Math.random() * 0.45;
-      var lw = 2.5 + Math.random() * 4;
-      var waveAmp = 2 + Math.random() * 4;
-      var waveFreq = 0.04 + Math.random() * 0.08;
-      var waveOff = Math.random() * Math.PI * 2;
-      // glow pass
-      state.ctx.save();
-      state.ctx.globalAlpha = alpha * 0.28;
-      state.ctx.strokeStyle = 'hsl(' + beamHue + ',100%,72%)';
-      state.ctx.lineWidth = lw * 7;
-      state.ctx.lineCap = 'round'; state.ctx.lineJoin = 'round';
-      state.ctx.beginPath();
-      var wx = lx0;
-      state.ctx.moveTo(wx, ly + Math.sin(wx * waveFreq + waveOff) * waveAmp);
-      for (wx += 3; wx <= lx1; wx += 3) {
-        state.ctx.lineTo(wx, ly + Math.sin(wx * waveFreq + waveOff) * waveAmp);
-      }
-      state.ctx.stroke();
-      state.ctx.restore();
-      // sharp pass
-      state.ctx.save();
-      state.ctx.globalAlpha = alpha;
-      state.ctx.strokeStyle = 'hsl(' + beamHue + ',100%,88%)';
-      state.ctx.lineWidth = lw;
-      state.ctx.lineCap = 'round'; state.ctx.lineJoin = 'round';
-      state.ctx.beginPath();
-      wx = lx0;
-      state.ctx.moveTo(wx, ly + Math.sin(wx * waveFreq + waveOff) * waveAmp);
-      for (wx += 3; wx <= lx1; wx += 3) {
-        state.ctx.lineTo(wx, ly + Math.sin(wx * waveFreq + waveOff) * waveAmp);
-      }
-      state.ctx.stroke();
-      state.ctx.restore();
-    }
-
-    // 4. Subtle tint
+    // 1. Gradient fill of the trapezoid — always visible even on white canvas.
+    //    Bright near the ship, fades toward the impact point.
+    var fillGrad = state.ctx.createLinearGradient(beamX, topY, beamX, botY);
+    fillGrad.addColorStop(0,   'hsla(' + beamHue + ',100%,72%,0.55)');
+    fillGrad.addColorStop(0.45,'hsla(' + beamHue + ',100%,65%,0.38)');
+    fillGrad.addColorStop(1,   'hsla(' + beamHue + ',100%,60%,0.14)');
     state.ctx.save();
-    state.ctx.fillStyle = 'hsla(' + beamHue + ',100%,65%,0.07)';
+    state.ctx.fillStyle = fillGrad;
     state.ctx.beginPath();
     state.ctx.moveTo(beamX - topW, topY);
     state.ctx.lineTo(beamX + topW, topY);
@@ -848,6 +769,41 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
     state.ctx.closePath();
     state.ctx.fill();
     state.ctx.restore();
+
+    // 2. Row jitter — scrambles interior pixels AND tears the beam edges outward.
+    //    edgeReach grows the jitter region beyond the trapezoid boundary so the
+    //    gradient's edges get warped into the surrounding area.
+    var edgeReach = 28;
+    var jx0 = Math.max(0, Math.floor((beamX - botW - edgeReach - 2) * DPR));
+    var jy0 = Math.max(0, Math.floor(topY * DPR));
+    var jx1 = Math.min(state.canvas.width,  Math.ceil((beamX + botW + edgeReach + 2) * DPR));
+    var jy1 = Math.min(state.canvas.height, Math.ceil(botY * DPR));
+    var pw = jx1 - jx0, ph = jy1 - jy0;
+    if (pw > 0 && ph > 0) {
+      var id = state.ctx.getImageData(jx0, jy0, pw, ph);
+      var src = new Uint8ClampedArray(id.data);
+      var d = id.data;
+      for (var row = 0; row < ph; row++) {
+        var cssY = (row + jy0) / DPR;
+        var tRow = (cssY - topY) / (botY - topY);
+        if (tRow < 0 || tRow > 1) continue;
+        var hw = (topW + (botW - topW) * tRow) * DPR;
+        var cx = beamX * DPR - jx0;
+        // Extend jitter reach beyond beam edge, increasing toward the base
+        var edgePad = Math.round(edgeReach * tRow * DPR);
+        var lx = Math.max(0, Math.round(cx - hw - edgePad));
+        var rx = Math.min(pw, Math.round(cx + hw + edgePad));
+        var maxJitter = Math.round(28 * tRow + 4);
+        var jitter = Math.round((Math.random() * 2 - 1) * maxJitter);
+        for (var col = lx; col < rx; col++) {
+          var sc = Math.min(Math.max(lx, col + jitter), rx - 1);
+          var di = (row * pw + col) * 4;
+          var si = (row * pw + sc) * 4;
+          d[di] = src[si]; d[di+1] = src[si+1]; d[di+2] = src[si+2];
+        }
+      }
+      state.ctx.putImageData(id, jx0, jy0);
+    }
   }
 
   var lastT = performance.now();
@@ -874,27 +830,54 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
       ghostEl.style.left = (canvasRect.left + beamX) + 'px';
       ghostEl.style.top = (canvasRect.top + dropY + (hoverY - dropY) * e) + 'px';
       ghostEl.style.transform = 'translate(-50%,-50%)';
-      if (t >= 1) { phase = 'beaming'; phaseT = now; }
+      if (t >= 1) { phase = 'beaming'; phaseT = now; beamSubPhaseT = now; }
 
     } else if (phase === 'beaming') {
-      beamExtent = Math.min(1, elapsed / 520);
-      drawBeam(beamExtent, now);
-      ghostEl.style.left = (canvasRect.left + beamX) + 'px';
-      ghostEl.style.top = (canvasRect.top + hoverY) + 'px';
-      ghostEl.style.transform = 'translate(-50%,-50%) scale(' + (1 + Math.sin(now * 0.02) * 0.04) + ')';
-      if (beamExtent >= 0.7) {
-        if (particleTimer <= 0) { spawnParticle(); particleTimer = 0.055; }
-        if (!invertDone && elapsed > 750) { doGlitchBeam(); invertDone = true; }
-      }
-      if (elapsed > 2000) { phase = 'retracting'; phaseT = now; }
-
-    } else if (phase === 'retracting') {
-      var t = Math.min(1, elapsed / 380);
-      drawBeam(1 - t * t, now);
-      if (t >= 1) {
-        particles = [];
-        state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
-        phase = 'ascend'; phaseT = now;
+      var subElapsed = now - beamSubPhaseT;
+      if (beamSubPhase === 'extending') {
+        beamExtent = Math.min(1, subElapsed / 520);
+        drawBeam(beamExtent, now);
+        ghostEl.style.left = (canvasRect.left + beamX) + 'px';
+        ghostEl.style.top  = (canvasRect.top  + hoverY) + 'px';
+        ghostEl.style.transform = 'translate(-50%,-50%) scale(' + (1 + Math.sin(now * 0.02) * 0.04) + ')';
+        if (beamExtent >= 0.7) {
+          if (particleTimer <= 0) { spawnParticle(); particleTimer = 0.055; }
+          if (!subGlitchFired && subElapsed > 650) { doGlitchBeam(); subGlitchFired = true; }
+        }
+        if (subGlitchFired && subElapsed > 950) {
+          beamSubPhase = 'shrinking'; beamSubPhaseT = now;
+        }
+      } else if (beamSubPhase === 'shrinking') {
+        var rt = Math.min(1, subElapsed / 300);
+        beamExtent = 1 - rt * rt;
+        drawBeam(beamExtent, now);
+        ghostEl.style.left = (canvasRect.left + beamX) + 'px';
+        ghostEl.style.top  = (canvasRect.top  + hoverY) + 'px';
+        ghostEl.style.transform = 'translate(-50%,-50%)';
+        if (rt >= 1) {
+          particles = [];
+          state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
+          targetIdx++;
+          if (targetIdx < allTargets.length) {
+            beamSubPhase = 'flying'; beamSubPhaseT = now;
+          } else {
+            phase = 'ascend'; phaseT = now;
+          }
+        }
+      } else if (beamSubPhase === 'flying') {
+        var tgt = allTargets[targetIdx];
+        var ft = Math.min(1, subElapsed / 420);
+        var fe = 1 - Math.pow(1 - ft, 3);
+        var flyX = beamX + (tgt.x - beamX) * fe;
+        var flyY = hoverY + (tgt.hoverY - hoverY) * fe;
+        ghostEl.style.left = (canvasRect.left + flyX) + 'px';
+        ghostEl.style.top  = (canvasRect.top  + flyY)  + 'px';
+        ghostEl.style.transform = 'translate(-50%,-50%)';
+        if (ft >= 1) {
+          beamX = tgt.x; beamBotY = tgt.botY; hoverY = tgt.hoverY; beamHalfW = tgt.halfW;
+          beamExtent = 0; subGlitchFired = false;
+          beamSubPhase = 'extending'; beamSubPhaseT = now;
+        }
       }
 
     } else if (phase === 'ascend') {
@@ -934,7 +917,8 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
   var pulseR = 0;
   var flashAlpha = 0;
   var glitchRings = [];
-  var secondDisplacementDone = false;
+  var warpSnap = null, warpT0 = 0;
+  var WARP_DURATION = 700;
 
   var phase = 'rise';
   var phaseT = performance.now();
@@ -955,6 +939,21 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
     flashAlpha = Math.max(0, flashAlpha - dt * 6);
 
     state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
+
+    // Smooth warp reveal — overlay fades from the pre-displacement snapshot to the
+    // displaced main canvas, giving a GPU-accelerated animated warp feel.
+    if (warpSnap) {
+      var _wt = Math.min(1, (now - warpT0) / WARP_DURATION);
+      var _we = 1 - Math.pow(1 - _wt, 2); // easeOutQuad
+      if (_we < 1) {
+        state.ovCtx.save();
+        state.ovCtx.globalAlpha = 1 - _we;
+        state.ovCtx.drawImage(warpSnap, 0, 0, state.canvasW, state.canvasH);
+        state.ovCtx.restore();
+      } else {
+        warpSnap = null;
+      }
+    }
 
     // Draw impact flash
     if (flashAlpha > 0) {
@@ -1043,9 +1042,15 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
       if (t >= 1) {
         phase = 'pulsing'; phaseT = now;
 
-        // 1. Radial pixel displacement — wider area than before (pushR 170)
+        // 1. Capture pre-displacement snapshot so we can animate the warp
+        warpSnap = document.createElement('canvas');
+        warpSnap.width = state.canvas.width; warpSnap.height = state.canvas.height;
+        warpSnap.getContext('2d').drawImage(state.canvas, 0, 0);
+        warpT0 = now;
+
+        // 2. Radial pixel displacement — push existing art outward in one shot
         (function() {
-          var pushR = 170, pushStr = 22, DPR = state.DPR;
+          var pushR = 200, pushStr = 35, DPR = state.DPR;
           var bx0 = Math.max(0, Math.floor((blastX - pushR - 2) * DPR));
           var by0 = Math.max(0, Math.floor((blastY - pushR - 2) * DPR));
           var bx1 = Math.min(state.canvas.width,  Math.ceil((blastX + pushR + 2) * DPR));
@@ -1076,7 +1081,7 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
           state.ctx.putImageData(dst, bx0, by0);
         })();
 
-        // 2. Epicentre glow — use pulseColor at 0 alpha for outer stop to avoid dark halo
+        // 3. Epicentre glow — use pulseColor at 0 alpha for outer stop to avoid dark halo
         var cg = state.ctx.createRadialGradient(blastX, blastY, 0, blastX, blastY, 30);
         cg.addColorStop(0, 'rgba(255,255,255,0.95)');
         cg.addColorStop(0.4, colorWithAlpha(pulseColor, 0.75));
@@ -1084,7 +1089,7 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
         state.ctx.fillStyle = cg;
         state.ctx.beginPath(); state.ctx.arc(blastX, blastY, 30, 0, Math.PI * 2); state.ctx.fill();
 
-        // 3. Initialise glitch rings — animated in pulsing phase, committed to main canvas
+        // 4. Initialise glitch rings — animated in pulsing phase, committed to main canvas
         //    when fully grown (so they scale up rather than popping in).
         glitchRings = [];
         var nRings = 2 + Math.floor(Math.random() * 2);
@@ -1118,10 +1123,9 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
         if (gr.committed) continue;
         var ringAge = now - gr.t0 - gr.delay;
         if (ringAge < 0) continue;
-        var ringT = Math.min(1, ringAge / 300);
-        var ringE = 1 - Math.pow(1 - ringT, 2.5); // easeOutQuint
-        var curR = gr.targetR * ringE;
-        var ringFadeIn = Math.min(1, ringAge / 70);
+        var ringT = Math.min(1, ringAge / 180); // just a fade timer, no scaling
+        var curR = gr.targetR;                  // full radius immediately
+        var ringFadeIn = ringT;
         if (curR < 1) continue;
         for (var _si = 0; _si < gr.segs.length; _si++) {
           var sg = gr.segs[_si];
@@ -1169,42 +1173,6 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
           }
           gr.committed = true;
         }
-      }
-
-      // Aftershock displacement at +350 ms — wider radius, gentler push
-      if (!secondDisplacementDone && elapsed > 350) {
-        secondDisplacementDone = true;
-        (function() {
-          var pushR = 230, pushStr = 8, DPR = state.DPR;
-          var bx0 = Math.max(0, Math.floor((blastX - pushR - 2) * DPR));
-          var by0 = Math.max(0, Math.floor((blastY - pushR - 2) * DPR));
-          var bx1 = Math.min(state.canvas.width,  Math.ceil((blastX + pushR + 2) * DPR));
-          var by1 = Math.min(state.canvas.height, Math.ceil((blastY + pushR + 2) * DPR));
-          var pw = bx1 - bx0, ph = by1 - by0;
-          if (pw <= 0 || ph <= 0) return;
-          var src = state.ctx.getImageData(bx0, by0, pw, ph);
-          var dst = new ImageData(pw, ph);
-          var sd = src.data, dd = dst.data;
-          var bcx = blastX * DPR - bx0, bcy = blastY * DPR - by0;
-          var maxRp = pushR * DPR, maxPush = pushStr * DPR;
-          for (var py = 0; py < ph; py++) {
-            for (var px = 0; px < pw; px++) {
-              var ddx = px - bcx, ddy = py - bcy;
-              var dist = Math.sqrt(ddx * ddx + ddy * ddy);
-              var di = (py * pw + px) * 4;
-              if (dist < 1 || dist > maxRp) {
-                dd[di] = sd[di]; dd[di+1] = sd[di+1]; dd[di+2] = sd[di+2]; dd[di+3] = sd[di+3];
-                continue;
-              }
-              var strength = (1 - dist / maxRp) * maxPush;
-              var sx = Math.min(Math.max(0, Math.round(px - (ddx / dist) * strength)), pw - 1);
-              var sy = Math.min(Math.max(0, Math.round(py - (ddy / dist) * strength)), ph - 1);
-              var si2 = (sy * pw + sx) * 4;
-              dd[di] = sd[si2]; dd[di+1] = sd[si2+1]; dd[di+2] = sd[si2+2]; dd[di+3] = sd[si2+3];
-            }
-          }
-          state.ctx.putImageData(dst, bx0, by0);
-        })();
       }
 
       if (pulseR >= maxR) { phase = 'leaving'; phaseT = now; }
