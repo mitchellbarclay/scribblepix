@@ -2,7 +2,7 @@ import state from '../state.js';
 import { hslToRgb, hexToRgb } from '../core/color-utils.js';
 import { getBrushStamp, stampDot } from '../core/brush-pipeline.js';
 import { saveHistory } from '../core/history.js';
-import { progressiveFloodFill } from '../core/fill.js';
+import { bucketPour } from '../core/fill.js';
 import { doBoom } from '../tools/explosion.js';
 
 // ---- Undo tool ----
@@ -152,105 +152,6 @@ function makeUndoTool() {
   return {move: moveDrag, end: endDrag};
 }
 
-// ---- Fill bucket tool ----
-
-function makeBucketTool() {
-  var btn = document.getElementById('bucket-btn');
-  var canvas = document.getElementById('bucket-canvas');
-  var locked = false, pressed = false;
-  var cursorX = 0, cursorY = 0;
-  var fillTriggerInput = null;
-  var riveRef = null;
-  var pendingFill = null; // {x, y} in canvas CSS coords
-
-  if (window.rive) {
-    riveRef = new window.rive.Rive({
-      src: 'src/rive/drag_tools.riv',
-      canvas: canvas,
-      artboard: 'Fill bucket',
-      stateMachines: 'State Machine 1',
-      autoplay: true,
-      layout: new window.rive.Layout({ fit: window.rive.Fit.None, alignment: window.rive.Alignment.Center }),
-      onLoad: function() {
-        var vm = riveRef.viewModelByName('DragToolsVM');
-        if (vm) {
-          var inst = vm.defaultInstance();
-          riveRef.bindViewModelInstance(inst);
-          fillTriggerInput = inst.trigger('fill');
-        }
-        riveRef.on(window.rive.EventType.RiveEvent, function(evt) {
-          if (evt.data && evt.data.name === 'fill' && pendingFill) {
-            doFillAt(pendingFill.x, pendingFill.y);
-          }
-        });
-      }
-    });
-  }
-
-  function doFillAt(cx, cy) {
-    if (!pendingFill) return;
-    pendingFill = null;
-    locked = false;
-    var fc = state.rainbowMode ? 'hsl('+Math.floor(Math.random()*360)+',100%,50%)' : state.color;
-    var rgb = fc.indexOf('hsl') === 0 ? hslToRgb(fc) : hexToRgb(fc);
-    progressiveFloodFill(Math.round(cx * state.DPR), Math.round(cy * state.DPR), rgb, function() {});
-  }
-
-  var pollDeadline = 0;
-  function pollFill() {
-    if (!pendingFill) return;
-    if (fillTriggerInput && fillTriggerInput.value) { doFillAt(pendingFill.x, pendingFill.y); return; }
-    if (performance.now() < pollDeadline) { requestAnimationFrame(pollFill); return; }
-    if (pendingFill) doFillAt(pendingFill.x, pendingFill.y); // timeout fallback
-  }
-
-  function toCanvas(cx, cy) {
-    var r = canvas.getBoundingClientRect();
-    return { x: cx - r.left, y: cy - r.top };
-  }
-
-  function startDrag(cx, cy) {
-    if (locked) return;
-    locked = true; pressed = true;
-    cursorX = cx; cursorY = cy;
-    var c = toCanvas(cx, cy);
-    if (riveRef) riveRef.pointerDown(c.x, c.y);
-  }
-
-  function moveDrag(cx, cy) {
-    if (!pressed) return;
-    cursorX = cx; cursorY = cy;
-    var c = toCanvas(cx, cy);
-    if (riveRef) riveRef.pointerMove(c.x, c.y);
-  }
-
-  function endDrag(cx, cy) {
-    if (!pressed) return;
-    pressed = false;
-    cursorX = cx; cursorY = cy;
-    var c = toCanvas(cx, cy);
-    if (riveRef) riveRef.pointerUp(c.x, c.y);
-
-    var cr = state.canvasArea.getBoundingClientRect();
-    var canvasX = cx - cr.left, canvasY = cy - cr.top;
-    var inCanvas = canvasX >= 0 && canvasX <= state.canvasW && canvasY >= 0 && canvasY <= state.canvasH;
-
-    if (inCanvas) {
-      saveHistory();
-      state.lastStrokePoints = null;
-      pendingFill = { x: canvasX, y: canvasY };
-      pollDeadline = performance.now() + 5000;
-      requestAnimationFrame(pollFill);
-    } else {
-      setTimeout(function() { locked = false; }, 700);
-    }
-  }
-
-  btn.addEventListener('mousedown',  function(e) { e.preventDefault(); startDrag(e.clientX, e.clientY); });
-  btn.addEventListener('touchstart', function(e) { e.preventDefault(); startDrag(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
-
-  return {move: moveDrag, end: endDrag};
-}
 
 // ---- Generic drag tool factory ----
 
@@ -1294,7 +1195,9 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
 
 export function initDragTools() {
   var undoTool = makeUndoTool();
-  var bucketTool = makeBucketTool();
+  var bucketTool = makeDragTool('bucket-btn', function(x, y, ghostEl) {
+    return new Promise(function(resolve) { bucketPour(x, y, ghostEl, resolve); });
+  });
   var dynamiteTool = makeDragTool('dynamite-btn', function(x, y, ghostEl) {
     return new Promise(function(resolve) { dynamitePlace(x, y, ghostEl, resolve); });
   });

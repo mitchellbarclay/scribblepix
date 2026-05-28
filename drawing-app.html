@@ -63,8 +63,6 @@ body { background: linear-gradient(135deg, var(--bg-c1) 0%, var(--bg-c2) 50%, va
 .drag-item-icon { width: 62px; height: 62px; }
 .drag-item-icon svg { width: 100% !important; height: 100% !important; }
 .drag-item-icon canvas { width: 100%; height: 100%; display: block; }
-#bucket-canvas { position: absolute !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; width: 300px !important; height: 400px !important; pointer-events: none; z-index: 51; }
-#bucket-btn, #bucket-btn .drag-item-icon { overflow: visible; }
 .drag-item-label { font-size: 10px; font-weight: bold; color: rgba(255,255,255,0.6); font-family: 'Fredoka', sans-serif; letter-spacing: 0.1em; text-transform: uppercase; }
 #canvas-area { flex: 1; background: #ffffff; overflow: hidden; position: relative; min-width: 0; }
 #resize-overlay { display: none; position: absolute; inset: 0; background: rgba(220,230,238,0.7); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 100; align-items: center; justify-content: center; flex-direction: column; gap: 18px; color: #1a1a2e; font-family: 'Fredoka', sans-serif; font-size: 20px; letter-spacing: 0.02em; }
@@ -179,9 +177,7 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
   </div>
   <div id="drag-shelf">
   <div class="drag-item" id="undo-btn" title="Undo"><div class="drag-item-icon"><canvas id="undo-canvas" width="124" height="124"></canvas></div></div>
-  <div class="drag-item" id="bucket-btn">
-    <div class="drag-item-icon"><canvas id="bucket-canvas" width="600" height="800"></canvas></div>
-  </div>
+  <div class="drag-item" id="bucket-btn" title="Fill"><div class="drag-item-icon"><img src="custom-icons/drag icons/bucket.svg" alt="bucket" style="width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;" draggable="false"></div></div>
   <div class="drag-item" id="alien-btn" title="Alien"><div class="drag-item-icon"><img src="custom-icons/drag icons/alien.svg" alt="alien" style="width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;" draggable="false"></div></div>
   <div class="drag-item" id="dynamite-btn">
     <div class="drag-item-icon"><img src="custom-icons/drag icons/dynamite.svg" alt="dynamite" style="width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;" draggable="false"></div>
