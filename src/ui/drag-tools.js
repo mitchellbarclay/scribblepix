@@ -1017,8 +1017,12 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
             var te = (lag + waveWp) / waveWp;
             strength = te * te * maxPushP;
           } else {
-            // Behind crest: exponential decay
-            strength = Math.exp(-lag / decayDp) * maxPushP;
+            // Behind crest: exponential decay but floors at the permanent
+            // displacement level — pixels settle rather than snap back to zero
+            var wavePart = Math.exp(-lag / decayDp) * maxPushP;
+            var finalRp2 = 210 * DPR, finalPushP2 = 20 * DPR;
+            var permPart = dist <= finalRp2 ? Math.pow(1 - dist / finalRp2, 0.4) * finalPushP2 : 0;
+            strength = Math.max(wavePart, permPart);
           }
         }
 
