@@ -701,11 +701,27 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
     var topY = hoverY + 10;
     var botY = topY + (beamBotY - topY) * ext;
     var topW = 5, botW = beamHalfW * Math.min(1, ext * 1.8);
+
+    // Outer soft halo — wide, very translucent ambient glow
+    var haloGrad = state.ovCtx.createLinearGradient(beamX, topY, beamX, botY);
+    haloGrad.addColorStop(0, 'hsla(' + beamHue + ',100%,80%,0.28)');
+    haloGrad.addColorStop(0.5, 'hsla(' + beamHue + ',100%,72%,0.10)');
+    haloGrad.addColorStop(1, 'hsla(' + beamHue + ',100%,72%,0.02)');
+    state.ovCtx.beginPath();
+    state.ovCtx.moveTo(beamX - topW * 3, topY);
+    state.ovCtx.lineTo(beamX + topW * 3, topY);
+    state.ovCtx.lineTo(beamX + botW * 1.55, botY);
+    state.ovCtx.lineTo(beamX - botW * 1.55, botY);
+    state.ovCtx.closePath();
+    state.ovCtx.fillStyle = haloGrad;
+    state.ovCtx.fill();
+
     // Main cone
     var grad = state.ovCtx.createLinearGradient(beamX, topY, beamX, botY);
-    grad.addColorStop(0, 'rgba(255,255,255,0.92)');
-    grad.addColorStop(0.35, 'hsla(' + beamHue + ',100%,72%,0.58)');
-    grad.addColorStop(1, 'hsla(' + beamHue + ',100%,72%,0.07)');
+    grad.addColorStop(0, 'rgba(255,255,255,0.97)');
+    grad.addColorStop(0.18, 'hsla(' + beamHue + ',100%,78%,0.72)');
+    grad.addColorStop(0.55, 'hsla(' + beamHue + ',100%,72%,0.42)');
+    grad.addColorStop(1, 'hsla(' + beamHue + ',100%,72%,0.06)');
     state.ovCtx.beginPath();
     state.ovCtx.moveTo(beamX - topW, topY);
     state.ovCtx.lineTo(beamX + topW, topY);
@@ -714,28 +730,54 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
     state.ovCtx.closePath();
     state.ovCtx.fillStyle = grad;
     state.ovCtx.fill();
-    // Two scan lines travelling downward
-    for (var s = 0; s < 2; s++) {
-      var frac = ((now * 0.0014 + s * 0.5) % 1);
+
+    // Bright UFO emission glow at the very top of the beam
+    var topGlow = state.ovCtx.createRadialGradient(beamX, topY, 0, beamX, topY, topW * 4 + 12);
+    topGlow.addColorStop(0, 'rgba(255,255,255,0.9)');
+    topGlow.addColorStop(0.3, 'hsla(' + beamHue + ',100%,85%,0.55)');
+    topGlow.addColorStop(1, 'hsla(' + beamHue + ',100%,80%,0)');
+    state.ovCtx.fillStyle = topGlow;
+    state.ovCtx.beginPath();
+    state.ovCtx.arc(beamX, topY, topW * 4 + 12, 0, Math.PI * 2);
+    state.ovCtx.fill();
+
+    // Three scan lines travelling downward
+    for (var s = 0; s < 3; s++) {
+      var frac = ((now * 0.0016 + s * 0.333) % 1);
       var scanY = topY + (botY - topY) * frac;
       var scanW = topW + (botW - topW) * frac;
-      state.ovCtx.strokeStyle = 'rgba(255,255,255,0.48)';
+      var scanAlpha = 0.55 * (1 - frac * 0.5);
+      state.ovCtx.strokeStyle = 'rgba(255,255,255,' + scanAlpha + ')';
       state.ovCtx.lineWidth = 1.5;
       state.ovCtx.beginPath();
       state.ovCtx.moveTo(beamX - scanW, scanY);
       state.ovCtx.lineTo(beamX + scanW, scanY);
       state.ovCtx.stroke();
     }
-    // Landing ellipse glow
-    if (ext > 0.8) {
-      var ga = ((ext - 0.8) / 0.2) * (0.45 + Math.sin(now * 0.013) * 0.2);
-      var rg = state.ovCtx.createRadialGradient(beamX, botY, 0, beamX, botY, botW * 0.95);
-      rg.addColorStop(0, 'hsla(' + beamHue + ',100%,85%,' + ga + ')');
-      rg.addColorStop(1, 'hsla(' + beamHue + ',100%,85%,0)');
-      state.ovCtx.fillStyle = rg;
+
+    // Landing ellipse — visible earlier and more prominent
+    if (ext > 0.5) {
+      var landT = (ext - 0.5) / 0.5;
+      var pulse = 0.6 + Math.sin(now * 0.018) * 0.2 + Math.sin(now * 0.031) * 0.12;
+      var ga = landT * pulse;
+      // Outer diffuse
+      var rg2 = state.ovCtx.createRadialGradient(beamX, botY, 0, beamX, botY, botW * 1.1);
+      rg2.addColorStop(0, 'hsla(' + beamHue + ',100%,90%,' + (ga * 0.55).toFixed(3) + ')');
+      rg2.addColorStop(0.5, 'hsla(' + beamHue + ',100%,80%,' + (ga * 0.22).toFixed(3) + ')');
+      rg2.addColorStop(1, 'hsla(' + beamHue + ',100%,80%,0)');
+      state.ovCtx.fillStyle = rg2;
       state.ovCtx.beginPath();
-      state.ovCtx.ellipse(beamX, botY, botW * 0.95, botW * 0.28, 0, 0, Math.PI * 2);
+      state.ovCtx.ellipse(beamX, botY, botW * 1.1, botW * 0.32, 0, 0, Math.PI * 2);
       state.ovCtx.fill();
+      // Bright ring stroke
+      state.ovCtx.save();
+      state.ovCtx.globalAlpha = landT * (0.7 + Math.sin(now * 0.02) * 0.2);
+      state.ovCtx.strokeStyle = 'hsla(' + beamHue + ',100%,92%,1)';
+      state.ovCtx.lineWidth = 2;
+      state.ovCtx.beginPath();
+      state.ovCtx.ellipse(beamX, botY, botW * 0.88, botW * 0.25, 0, 0, Math.PI * 2);
+      state.ovCtx.stroke();
+      state.ovCtx.restore();
     }
     // Abduction particles
     for (var i = 0; i < particles.length; i++) {
@@ -826,7 +868,7 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
     }
 
     if (phase === 'descend') {
-      var t = Math.min(1, elapsed / 400);
+      var t = Math.min(1, elapsed / 270);
       var e = 1 - Math.pow(1 - t, 3);
       ghostEl.style.left = (canvasRect.left + beamX) + 'px';
       ghostEl.style.top = (canvasRect.top + dropY + (hoverY - dropY) * e) + 'px';
@@ -836,20 +878,20 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
     } else if (phase === 'beaming') {
       var subElapsed = now - beamSubPhaseT;
       if (beamSubPhase === 'extending') {
-        beamExtent = Math.min(1, subElapsed / 520);
+        beamExtent = Math.min(1, subElapsed / 360);
         drawBeam(beamExtent, now);
         ghostEl.style.left = (canvasRect.left + beamX) + 'px';
         ghostEl.style.top  = (canvasRect.top  + hoverY) + 'px';
         ghostEl.style.transform = 'translate(-50%,-50%) scale(' + (1 + Math.sin(now * 0.02) * 0.04) + ')';
         if (beamExtent >= 0.7) {
           if (particleTimer <= 0) { spawnParticle(); particleTimer = 0.055; }
-          if (!subGlitchFired && subElapsed > 650) { doGlitchBeam(); subGlitchFired = true; }
+          if (!subGlitchFired && subElapsed > 420) { doGlitchBeam(); subGlitchFired = true; }
         }
-        if (subGlitchFired && subElapsed > 950) {
+        if (subGlitchFired && subElapsed > 640) {
           beamSubPhase = 'shrinking'; beamSubPhaseT = now;
         }
       } else if (beamSubPhase === 'shrinking') {
-        var rt = Math.min(1, subElapsed / 300);
+        var rt = Math.min(1, subElapsed / 200);
         beamExtent = 1 - rt * rt;
         drawBeam(beamExtent, now);
         ghostEl.style.left = (canvasRect.left + beamX) + 'px';
@@ -867,7 +909,7 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
         }
       } else if (beamSubPhase === 'flying') {
         var tgt = allTargets[targetIdx];
-        var ft = Math.min(1, subElapsed / 420);
+        var ft = Math.min(1, subElapsed / 280);
         var fe = 1 - Math.pow(1 - ft, 3);
         var flyX = beamX + (tgt.x - beamX) * fe;
         var flyY = hoverY + (tgt.hoverY - hoverY) * fe;
@@ -882,7 +924,7 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
       }
 
     } else if (phase === 'ascend') {
-      var t = Math.min(1, elapsed / 500);
+      var t = Math.min(1, elapsed / 330);
       ghostEl.style.top  = (canvasRect.top + hoverY - state.canvasH * 0.55 * t * t) + 'px';
       ghostEl.style.opacity = String(Math.max(0, 1 - t * 1.7));
       if (t >= 1) { onDone(); return; }
@@ -894,8 +936,9 @@ function alienBeam(dropX, dropY, ghostEl, onDone) {
 }
 
 // ---- Alien starblast effect ----
-// First blast fires immediately at the drop point, then UFO teleports to 2-3
-// more positions for additional blasts. Charge rings expand before each blast.
+// UFO charges up then fires a shockwave. The displacement is computed per-frame —
+// pixels at the wave front are pushed outward; the wave decays behind it. No static
+// pre-bake: the distortion literally travels across the canvas as the ring expands.
 
 function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
   saveHistory();
@@ -904,22 +947,24 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
 
   var ufoX = dropX;
   var hoverY = Math.max(50, dropY - 85);
-  // Blast fires from just below the UFO (where the orb charges up), not from the
-  // original drop point — this prevents the stamp "popping" 85px below the UFO.
   var blastX = ufoX, blastY = hoverY + 28;
   var pulseColor = pickAlienColor();
-  // Max radius: distance from blast point to farthest canvas corner
   var maxR = Math.ceil(Math.sqrt(
     Math.pow(Math.max(blastX, state.canvasW - blastX), 2) +
     Math.pow(Math.max(blastY, state.canvasH - blastY), 2)
   )) + 10;
-  var PULSE_SPEED = 560; // CSS px/s — slightly snappier
+  var PULSE_SPEED = 520; // CSS px/s
+
+  // Wave displacement params (CSS px)
+  var WAVE_PUSH_R  = 260; // max effect radius
+  var WAVE_W       = 55;  // leading-edge thickness — pixels inside this zone get pushed
+  var WAVE_DECAY   = 80;  // exponential decay distance behind the ring crest
+  var WAVE_MAX     = 46;  // peak displacement at ring crest
 
   var pulseR = 0;
   var flashAlpha = 0;
   var glitchRings = [];
-  var warpSnap = null, warpT0 = 0;
-  var WARP_DURATION = 700;
+  var snapData = null; // ImageData of canvas before the blast
 
   var phase = 'rise';
   var phaseT = performance.now();
@@ -929,6 +974,105 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
   ghostEl.style.left = (canvasRect.left + ufoX) + 'px';
   ghostEl.style.top  = (canvasRect.top  + dropY) + 'px';
   ghostEl.style.transform = 'translate(-50%,-50%)';
+
+  // Per-frame wave displacement — reads from snapData, writes to main canvas.
+  // Displacement peaks at the ring crest and decays exponentially behind it.
+  // Pixels ahead of the ring are untouched (no preview of what will happen).
+  function applyWaveDisplace() {
+    if (!snapData) return;
+    var DPR = state.DPR;
+    var waveRp  = pulseR     * DPR;
+    var waveWp  = WAVE_W     * DPR;
+    var decayDp = WAVE_DECAY * DPR;
+    var maxPushP = WAVE_MAX  * DPR;
+    var pushRp  = WAVE_PUSH_R * DPR;
+    var bcx = blastX * DPR, bcy = blastY * DPR;
+    var snapW = snapData.width, snapH = snapData.height;
+    var sd = snapData.data;
+
+    // Only process the annular band the ring has reached plus the decay trail
+    var outerR = Math.min(pushRp, waveRp + waveWp);
+    var bx0 = Math.max(0, Math.floor(bcx - outerR - 2));
+    var by0 = Math.max(0, Math.floor(bcy - outerR - 2));
+    var bx1 = Math.min(state.canvas.width,  Math.ceil(bcx + outerR + 2));
+    var by1 = Math.min(state.canvas.height, Math.ceil(bcy + outerR + 2));
+    var pw = bx1 - bx0, ph = by1 - by0;
+    if (pw <= 0 || ph <= 0) return;
+
+    var dst = new ImageData(pw, ph);
+    var dd = dst.data;
+
+    for (var py = 0; py < ph; py++) {
+      for (var px = 0; px < pw; px++) {
+        var wx = px + bx0, wy = py + by0;
+        var ddx = wx - bcx, ddy = wy - bcy;
+        var dist = Math.sqrt(ddx * ddx + ddy * ddy);
+        var di = (py * pw + px) * 4;
+
+        var strength = 0;
+        var lag = waveRp - dist; // positive = behind the crest
+        if (dist > 0 && lag >= -waveWp && dist <= pushRp) {
+          if (lag < 0) {
+            // Leading edge: quadratic rise as wave approaches
+            var te = (lag + waveWp) / waveWp;
+            strength = te * te * maxPushP;
+          } else {
+            // Behind crest: exponential decay
+            strength = Math.exp(-lag / decayDp) * maxPushP;
+          }
+        }
+
+        var srcX, srcY;
+        if (strength < 0.5 || dist < 1) {
+          srcX = wx; srcY = wy;
+        } else {
+          srcX = Math.min(Math.max(0, Math.round(wx - (ddx / dist) * strength)), snapW - 1);
+          srcY = Math.min(Math.max(0, Math.round(wy - (ddy / dist) * strength)), snapH - 1);
+        }
+        var si = (srcY * snapW + srcX) * 4;
+        dd[di] = sd[si]; dd[di+1] = sd[si+1]; dd[di+2] = sd[si+2]; dd[di+3] = sd[si+3];
+      }
+    }
+    state.ctx.putImageData(dst, bx0, by0);
+  }
+
+  // Permanent moderate displacement burned in once the wave has passed
+  function burnFinalDisplace() {
+    if (!snapData) return;
+    var DPR = state.DPR;
+    var finalR = 210, finalPush = 20;
+    var fRp = finalR * DPR, fPp = finalPush * DPR;
+    var bcx = blastX * DPR, bcy = blastY * DPR;
+    var snapW = snapData.width, snapH = snapData.height;
+    var sd = snapData.data;
+    var bx0 = Math.max(0, Math.floor((blastX - finalR - 2) * DPR));
+    var by0 = Math.max(0, Math.floor((blastY - finalR - 2) * DPR));
+    var bx1 = Math.min(state.canvas.width,  Math.ceil((blastX + finalR + 2) * DPR));
+    var by1 = Math.min(state.canvas.height, Math.ceil((blastY + finalR + 2) * DPR));
+    var pw = bx1 - bx0, ph = by1 - by0;
+    if (pw <= 0 || ph <= 0) return;
+    var dst = new ImageData(pw, ph);
+    var dd = dst.data;
+    for (var py = 0; py < ph; py++) {
+      for (var px = 0; px < pw; px++) {
+        var wx = px + bx0, wy = py + by0;
+        var ddx = wx - bcx, ddy = wy - bcy;
+        var dist = Math.sqrt(ddx * ddx + ddy * ddy);
+        var di = (py * pw + px) * 4;
+        var srcX, srcY;
+        if (dist < 1 || dist > fRp) {
+          srcX = wx; srcY = wy;
+        } else {
+          var str = Math.pow(1 - dist / fRp, 0.4) * fPp;
+          srcX = Math.min(Math.max(0, Math.round(wx - (ddx / dist) * str)), snapW - 1);
+          srcY = Math.min(Math.max(0, Math.round(wy - (ddy / dist) * str)), snapH - 1);
+        }
+        var si = (srcY * snapW + srcX) * 4;
+        dd[di] = sd[si]; dd[di+1] = sd[si+1]; dd[di+2] = sd[si+2]; dd[di+3] = sd[si+3];
+      }
+    }
+    state.ctx.putImageData(dst, bx0, by0);
+  }
 
   var lastT = performance.now();
   function frame() {
@@ -941,21 +1085,6 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
 
     state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
 
-    // Smooth warp reveal — overlay fades from the pre-displacement snapshot to the
-    // displaced main canvas, giving a GPU-accelerated animated warp feel.
-    if (warpSnap) {
-      var _wt = Math.min(1, (now - warpT0) / WARP_DURATION);
-      var _we = 1 - Math.pow(1 - _wt, 2); // easeOutQuad
-      if (_we < 1) {
-        state.ovCtx.save();
-        state.ovCtx.globalAlpha = 1 - _we;
-        state.ovCtx.drawImage(warpSnap, 0, 0, state.canvasW, state.canvasH);
-        state.ovCtx.restore();
-      } else {
-        warpSnap = null;
-      }
-    }
-
     // Draw impact flash
     if (flashAlpha > 0) {
       var fg = state.ovCtx.createRadialGradient(blastX, blastY, 0, blastX, blastY, 55);
@@ -966,24 +1095,21 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
       state.ovCtx.beginPath(); state.ovCtx.arc(blastX, blastY, 55, 0, Math.PI * 2); state.ovCtx.fill();
     }
 
-    // Draw expanding pulse ring on overlay
+    // Expanding pulse ring
     if (phase === 'pulsing' && pulseR > 0 && pulseR < maxR + 30) {
       var ringFade = Math.max(0, 1 - pulseR / maxR);
-      // Outer soft glow
       state.ovCtx.save();
       state.ovCtx.globalAlpha = ringFade * 0.45;
       state.ovCtx.strokeStyle = pulseColor;
       state.ovCtx.lineWidth = 22;
       state.ovCtx.beginPath(); state.ovCtx.arc(blastX, blastY, pulseR, 0, Math.PI * 2); state.ovCtx.stroke();
       state.ovCtx.restore();
-      // Mid ring
       state.ovCtx.save();
       state.ovCtx.globalAlpha = ringFade * 0.75;
       state.ovCtx.strokeStyle = pulseColor;
       state.ovCtx.lineWidth = 7;
       state.ovCtx.beginPath(); state.ovCtx.arc(blastX, blastY, pulseR, 0, Math.PI * 2); state.ovCtx.stroke();
       state.ovCtx.restore();
-      // Bright white core
       state.ovCtx.save();
       state.ovCtx.globalAlpha = ringFade * 0.95;
       state.ovCtx.strokeStyle = 'white';
@@ -1003,7 +1129,6 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
 
     } else if (phase === 'charging') {
       var t = Math.min(1, elapsed / 680);
-      // Rings converge inward toward an orb below the UFO
       var orbY = hoverY + 28;
       for (var r = 0; r < 5; r++) {
         var ringPhase = ((now * 0.0022 + r * 0.2) % 1);
@@ -1018,7 +1143,6 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
           state.ovCtx.restore();
         }
       }
-      // Glowing orb grows as charge builds
       var orbR = t * 14;
       if (orbR > 0.5) {
         var og = state.ovCtx.createRadialGradient(ufoX, orbY, 0, ufoX, orbY, orbR);
@@ -1043,46 +1167,13 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
       if (t >= 1) {
         phase = 'pulsing'; phaseT = now;
 
-        // 1. Capture pre-displacement snapshot so we can animate the warp
-        warpSnap = document.createElement('canvas');
-        warpSnap.width = state.canvas.width; warpSnap.height = state.canvas.height;
-        warpSnap.getContext('2d').drawImage(state.canvas, 0, 0);
-        warpT0 = now;
+        // Capture snapshot for per-frame displacement reads
+        var snapCanvas = document.createElement('canvas');
+        snapCanvas.width = state.canvas.width; snapCanvas.height = state.canvas.height;
+        snapCanvas.getContext('2d').drawImage(state.canvas, 0, 0);
+        snapData = snapCanvas.getContext('2d').getImageData(0, 0, snapCanvas.width, snapCanvas.height);
 
-        // 2. Radial pixel displacement — push existing art outward in one shot
-        (function() {
-          var pushR = 200, pushStr = 35, DPR = state.DPR;
-          var bx0 = Math.max(0, Math.floor((blastX - pushR - 2) * DPR));
-          var by0 = Math.max(0, Math.floor((blastY - pushR - 2) * DPR));
-          var bx1 = Math.min(state.canvas.width,  Math.ceil((blastX + pushR + 2) * DPR));
-          var by1 = Math.min(state.canvas.height, Math.ceil((blastY + pushR + 2) * DPR));
-          var pw = bx1 - bx0, ph = by1 - by0;
-          if (pw <= 0 || ph <= 0) return;
-          var src = state.ctx.getImageData(bx0, by0, pw, ph);
-          var dst = new ImageData(pw, ph);
-          var sd = src.data, dd = dst.data;
-          var bcx = blastX * DPR - bx0, bcy = blastY * DPR - by0;
-          var maxRp = pushR * DPR, maxPush = pushStr * DPR;
-          for (var py = 0; py < ph; py++) {
-            for (var px = 0; px < pw; px++) {
-              var ddx = px - bcx, ddy = py - bcy;
-              var dist = Math.sqrt(ddx * ddx + ddy * ddy);
-              var di = (py * pw + px) * 4;
-              if (dist < 1 || dist > maxRp) {
-                dd[di] = sd[di]; dd[di+1] = sd[di+1]; dd[di+2] = sd[di+2]; dd[di+3] = sd[di+3];
-                continue;
-              }
-              var strength = (1 - dist / maxRp) * maxPush;
-              var sx = Math.min(Math.max(0, Math.round(px - (ddx / dist) * strength)), pw - 1);
-              var sy = Math.min(Math.max(0, Math.round(py - (ddy / dist) * strength)), ph - 1);
-              var si = (sy * pw + sx) * 4;
-              dd[di] = sd[si]; dd[di+1] = sd[si+1]; dd[di+2] = sd[si+2]; dd[di+3] = sd[si+3];
-            }
-          }
-          state.ctx.putImageData(dst, bx0, by0);
-        })();
-
-        // 3. Epicentre glow — use pulseColor at 0 alpha for outer stop to avoid dark halo
+        // Epicentre flash burned in
         var cg = state.ctx.createRadialGradient(blastX, blastY, 0, blastX, blastY, 30);
         cg.addColorStop(0, 'rgba(255,255,255,0.95)');
         cg.addColorStop(0.4, colorWithAlpha(pulseColor, 0.75));
@@ -1090,12 +1181,11 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
         state.ctx.fillStyle = cg;
         state.ctx.beginPath(); state.ctx.arc(blastX, blastY, 30, 0, Math.PI * 2); state.ctx.fill();
 
-        // 4. Initialise glitch rings — animated in pulsing phase, committed to main canvas
-        //    when fully grown (so they scale up rather than popping in).
+        // Glitch rings
         glitchRings = [];
         var nRings = 2 + Math.floor(Math.random() * 2);
         for (var ri = 0; ri < nRings; ri++) {
-          var rr = 55 + ri * (30 + Math.random() * 25);
+          var rr2 = 55 + ri * (30 + Math.random() * 25);
           var gapCount = 2 + Math.floor(Math.random() * 3);
           var startAngle = Math.random() * Math.PI * 2;
           var segs = [];
@@ -1108,75 +1198,70 @@ function alienPlasmaPulse(dropX, dropY, ghostEl, onDone) {
               lw: 1.5 + Math.random() * 2.5
             });
           }
-          glitchRings.push({ targetR: rr, delay: ri * 90, segs: segs, t0: now, committed: false });
+          glitchRings.push({ targetR: rr2, delay: ri * 90, segs: segs, t0: now, committed: false });
         }
       }
 
     } else if (phase === 'pulsing') {
       pulseR += dt * PULSE_SPEED;
+
+      // Progressive per-frame displacement — wave travels outward from snapshot pixels
+      applyWaveDisplace();
+
       ghostEl.style.left = (canvasRect.left + ufoX) + 'px';
       ghostEl.style.top  = (canvasRect.top  + hoverY) + 'px';
       ghostEl.style.transform = 'translate(-50%,-50%)';
 
-      // Animate glitch rings — grow on overlay, commit permanently to main canvas once full
+      // Glitch rings fade in on overlay, commit to canvas once visible
       for (var _ri = 0; _ri < glitchRings.length; _ri++) {
         var gr = glitchRings[_ri];
         if (gr.committed) continue;
         var ringAge = now - gr.t0 - gr.delay;
         if (ringAge < 0) continue;
-        var ringT = Math.min(1, ringAge / 180); // just a fade timer, no scaling
-        var curR = gr.targetR;                  // full radius immediately
-        var ringFadeIn = ringT;
+        var ringT = Math.min(1, ringAge / 180);
+        var curR = gr.targetR;
         if (curR < 1) continue;
         for (var _si = 0; _si < gr.segs.length; _si++) {
           var sg = gr.segs[_si];
           state.ovCtx.save();
-          state.ovCtx.globalAlpha = sg.alpha * ringFadeIn * 0.4;
+          state.ovCtx.globalAlpha = sg.alpha * ringT * 0.4;
           state.ovCtx.strokeStyle = pulseColor;
           state.ovCtx.lineWidth = sg.lw + 8;
           state.ovCtx.beginPath(); state.ovCtx.arc(blastX, blastY, curR, sg.a0, sg.a1); state.ovCtx.stroke();
           state.ovCtx.restore();
           state.ovCtx.save();
-          state.ovCtx.globalAlpha = sg.alpha * ringFadeIn;
+          state.ovCtx.globalAlpha = sg.alpha * ringT;
           state.ovCtx.strokeStyle = 'white';
           state.ovCtx.lineWidth = sg.lw * 0.6;
           state.ovCtx.beginPath(); state.ovCtx.arc(blastX, blastY, curR, sg.a0, sg.a1); state.ovCtx.stroke();
           state.ovCtx.restore();
           state.ovCtx.save();
-          state.ovCtx.globalAlpha = sg.alpha * ringFadeIn * 0.8;
+          state.ovCtx.globalAlpha = sg.alpha * ringT * 0.8;
           state.ovCtx.strokeStyle = pulseColor;
           state.ovCtx.lineWidth = sg.lw;
           state.ovCtx.beginPath(); state.ovCtx.arc(blastX, blastY, curR, sg.a0, sg.a1); state.ovCtx.stroke();
           state.ovCtx.restore();
         }
         if (ringT >= 1) {
-          // Commit at full size to main canvas
           for (var _si2 = 0; _si2 < gr.segs.length; _si2++) {
             var sg2 = gr.segs[_si2];
-            state.ctx.save();
-            state.ctx.globalAlpha = sg2.alpha * 0.3;
-            state.ctx.strokeStyle = pulseColor;
-            state.ctx.lineWidth = sg2.lw + 8;
-            state.ctx.beginPath(); state.ctx.arc(blastX, blastY, gr.targetR, sg2.a0, sg2.a1); state.ctx.stroke();
-            state.ctx.restore();
-            state.ctx.save();
-            state.ctx.globalAlpha = sg2.alpha;
-            state.ctx.strokeStyle = 'white';
-            state.ctx.lineWidth = sg2.lw * 0.6;
-            state.ctx.beginPath(); state.ctx.arc(blastX, blastY, gr.targetR, sg2.a0, sg2.a1); state.ctx.stroke();
-            state.ctx.restore();
-            state.ctx.save();
-            state.ctx.globalAlpha = sg2.alpha * 0.8;
-            state.ctx.strokeStyle = pulseColor;
-            state.ctx.lineWidth = sg2.lw;
-            state.ctx.beginPath(); state.ctx.arc(blastX, blastY, gr.targetR, sg2.a0, sg2.a1); state.ctx.stroke();
-            state.ctx.restore();
+            state.ctx.save(); state.ctx.globalAlpha = sg2.alpha * 0.3; state.ctx.strokeStyle = pulseColor; state.ctx.lineWidth = sg2.lw + 8;
+            state.ctx.beginPath(); state.ctx.arc(blastX, blastY, gr.targetR, sg2.a0, sg2.a1); state.ctx.stroke(); state.ctx.restore();
+            state.ctx.save(); state.ctx.globalAlpha = sg2.alpha; state.ctx.strokeStyle = 'white'; state.ctx.lineWidth = sg2.lw * 0.6;
+            state.ctx.beginPath(); state.ctx.arc(blastX, blastY, gr.targetR, sg2.a0, sg2.a1); state.ctx.stroke(); state.ctx.restore();
+            state.ctx.save(); state.ctx.globalAlpha = sg2.alpha * 0.8; state.ctx.strokeStyle = pulseColor; state.ctx.lineWidth = sg2.lw;
+            state.ctx.beginPath(); state.ctx.arc(blastX, blastY, gr.targetR, sg2.a0, sg2.a1); state.ctx.stroke(); state.ctx.restore();
           }
           gr.committed = true;
         }
       }
 
-      if (pulseR >= maxR) { phase = 'leaving'; phaseT = now; }
+      if (pulseR >= maxR) {
+        // Wave has crossed the whole canvas — burn in permanent settled displacement
+        burnFinalDisplace();
+        snapData = null;
+        phase = 'leaving'; phaseT = now;
+      }
 
     } else if (phase === 'leaving') {
       var t = Math.min(1, elapsed / 480);
