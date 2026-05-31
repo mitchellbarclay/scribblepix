@@ -18,13 +18,11 @@ export function initRiveDock() {
   if (!canvas) return;
 
   _sizeCanvas(canvas);
-  // ResizeObserver fires after layout is committed, so clientWidth/Height are
-  // already updated — more reliable than window.resize for reading the new size.
-  new ResizeObserver(function() {
+  window.addEventListener('resize', function() {
     _sizeCanvas(canvas);
     if (_riveInst) _riveInst.resizeDrawingSurfaceToCanvas();
     _pushCanvasSize();
-  }).observe(state.canvasArea || document.getElementById('canvas-area'));
+  });
 
   // Rive sets up its own pointer listeners on the canvas via setupRiveListeners
   // (called automatically on construction). We give the canvas pointer-events: auto
