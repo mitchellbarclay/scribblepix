@@ -1,12 +1,22 @@
 import state from '../state.js';
 import { adjacentColor, shadeColor } from '../core/color-utils.js';
 
-var GROW_DURATION = 220;
+var GROW_DURATION = 220; // ms per leaf grow-in
 
 function easeOut(t) {
   return 1 - Math.pow(1 - t, 3);
 }
 
+// Leaf object fields used by drawLeaf (all set at spawn, never mutated):
+//   dx, dy      — normalised growth direction
+//   len         — total length
+//   squat       — width-to-length ratio
+//   peakT       — where the leaf is widest (0–1 along length)
+//   asym        — left/right bulge asymmetry (–0.5..+0.5)
+//   fillColor   — base fill colour
+//   rimColor    — midrib and edge colour
+//
+// Caller must ctx.translate(cx, cy) and set ctx.globalAlpha before calling.
 function drawLeaf(ctx, leaf) {
   ctx.save();
 
@@ -16,8 +26,8 @@ function drawLeaf(ctx, leaf) {
   var px = -dy, py = dx;
   var pt = leaf.peakT;
   var al = leaf.asym;
-  var lhw = halfW * (1 + al);
-  var rhw = halfW * (1 - al);
+  var lhw = halfW * (1 + al); // left-side bulge
+  var rhw = halfW * (1 - al); // right-side bulge
   var baseAlpha = ctx.globalAlpha;
 
   function leafPath(ox, oy, l, lw, rw) {
@@ -36,20 +46,29 @@ function drawLeaf(ctx, leaf) {
     ctx.closePath();
   }
 
+  function mainPath() { leafPath(0, 0, len, lhw, rhw); }
+
+  // Gradient fill: richer/darker at base, lighter at tip
   var grad = ctx.createLinearGradient(0, 0, dx * len, dy * len);
   grad.addColorStop(0.00, shadeColor(leaf.fillColor, -0.12, +5));
   grad.addColorStop(0.45, leaf.fillColor);
   grad.addColorStop(1.00, shadeColor(leaf.fillColor, +0.22, -8));
-  leafPath(0, 0, len, lhw, rhw);
+
+  mainPath();
   ctx.fillStyle = grad;
   ctx.globalAlpha = baseAlpha;
   ctx.fill();
 
-  leafPath(px * halfW * 0.22, py * halfW * 0.22, len * 0.65, halfW * 0.40, halfW * 0.40);
+  function hiPath() {
+    var hl = len * 0.65, hhw = halfW * 0.40;
+    leafPath(px * halfW * 0.22, py * halfW * 0.22, hl, hhw, hhw);
+  }
+  hiPath();
   ctx.fillStyle = shadeColor(leaf.fillColor, +0.28, -6);
   ctx.globalAlpha = baseAlpha * 0.30;
   ctx.fill();
 
+  // Midrib — curves gently toward the heavier side
   var mCtrlX = dx * len * 0.48 - px * halfW * al * 0.22;
   var mCtrlY = dy * len * 0.48 - py * halfW * al * 0.22;
   ctx.beginPath();
@@ -106,18 +125,20 @@ function vineOverlayFrame() {
 
 export function drawVineStrokeV2(x, y, col) {
   if (!state.vineStrokeV2) {
+    // Match original vine-brush.js sizing
     var leafBase = Math.max(22, state.brushSize * 0.95);
     state.vineStrokeV2 = {
       lx: state.lastX, ly: state.lastY,
-      prevMidX: null, prevMidY: null,
+      prevMidX: null, prevMidY: null, // for smooth quadratic stem
       dir: null,
-      stemDist:        0,
-      accumLeaf:       0,
-      side:            1,
-      leafBase:        leafBase,
+      stemDist: 0,
+      accumLeaf: 0,
+      side: 1,
+      phase: Math.random() * Math.PI * 2,
+      leafBase: leafBase,
       nextLeafSpacing: leafBase * (0.7 + Math.random() * 0.55),
-      stemW:           Math.max(2, state.brushSize * 0.38),
-      stemCol:         shadeColor(col, -0.18, +10),
+      stemDark: shadeColor(col, -0.22, +12),
+      stemHi:   shadeColor(col, +0.20, -8),
     };
   }
 
@@ -137,34 +158,50 @@ export function drawVineStrokeV2(x, y, col) {
     }
   }
 
-  // Stem: single solid-colour pass drawn directly to main canvas.
-  // Solid opaque colour + round caps means cap-overlap zones are repainted with
-  // the exact same colour — no visible seam, no gradient mismatch.
+  // Stem — direct to main canvas
+  var stemW = Math.max(2, state.brushSize * 0.38);
+  var fullW = stemW;
+
+  // Midpoint-quadratic technique: arcs through midpoints give smooth joins
   var midX = (st.lx + x) * 0.5, midY = (st.ly + y) * 0.5;
   var hasPrev = st.prevMidX !== null;
 
-  state.ctx.save();
-  state.ctx.beginPath();
-  if (hasPrev) {
-    state.ctx.moveTo(st.prevMidX, st.prevMidY);
-    state.ctx.quadraticCurveTo(st.lx, st.ly, midX, midY);
-  } else {
-    state.ctx.moveTo(st.lx, st.ly);
-    state.ctx.lineTo(midX, midY);
+  function stemPath() {
+    state.ctx.beginPath();
+    if (hasPrev) {
+      state.ctx.moveTo(st.prevMidX, st.prevMidY);
+      state.ctx.quadraticCurveTo(st.lx, st.ly, midX, midY);
+    } else {
+      state.ctx.moveTo(st.lx, st.ly);
+      state.ctx.lineTo(midX, midY);
+    }
   }
-  state.ctx.lineWidth   = st.stemW;
-  state.ctx.strokeStyle = st.stemCol;
-  state.ctx.lineCap     = 'round';
-  state.ctx.lineJoin    = 'round';
+
+  // Fixed world-space gradient: always lit from top, regardless of stroke direction.
+  // Single opaque stroke — no per-segment alpha stacking, no rib artifacts, no crinkle.
+  var hw = fullW * 0.5;
+  var stemGrad = state.ctx.createLinearGradient(midX, midY - hw, midX, midY + hw);
+  stemGrad.addColorStop(0.00, st.stemHi);
+  stemGrad.addColorStop(0.35, col);
+  stemGrad.addColorStop(1.00, st.stemDark);
+
+  state.ctx.save();
+  state.ctx.lineCap = 'round';
+  state.ctx.lineJoin = 'round';
+  stemPath();
+  state.ctx.lineWidth   = fullW;
+  state.ctx.strokeStyle = stemGrad;
   state.ctx.globalAlpha = 1.0;
   state.ctx.stroke();
   state.ctx.restore();
 
   st.prevMidX = midX; st.prevMidY = midY;
+
   st.lx = x; st.ly = y;
   st.stemDist  += d;
   st.accumLeaf += d;
 
+  // Spawn leaves
   while (st.accumLeaf >= st.nextLeafSpacing && st.dir) {
     st.accumLeaf -= st.nextLeafSpacing;
     st.nextLeafSpacing = st.leafBase * (0.7 + Math.random() * 0.55);
@@ -181,21 +218,23 @@ export function drawVineStrokeV2(x, y, col) {
     var ang = (Math.random() - 0.5) * 0.98;
     var ca = Math.cos(ang), sa = Math.sin(ang);
 
+    // Match original vine-brush.js leaf sizing
     var leafLen = Math.max(24, state.brushSize * 1.9) * (0.80 + Math.random() * 0.50);
+
     var leafCol = adjacentColor(col, 25);
 
     state.vineLiveLeaves.push({
       cx: x, cy: y,
       dx: ldx * ca - ldy * sa,
       dy: ldx * sa + ldy * ca,
-      len:         leafLen,
-      squat:       0.70 + Math.random() * 0.18,
-      peakT:       0.36 + Math.random() * 0.14,
-      asym:        (Math.random() - 0.5) * 0.28,
-      fillColor:   leafCol,
-      rimColor:    shadeColor(leafCol, -0.25, +8),
-      alpha:       1.0,
-      born:        performance.now(),
+      len:       leafLen,
+      squat:     0.70 + Math.random() * 0.18,
+      peakT:     0.36 + Math.random() * 0.14,
+      asym:      (Math.random() - 0.5) * 0.28, // subtle asymmetry only
+      fillColor: leafCol,
+      rimColor:  shadeColor(leafCol, -0.25, +8),
+      alpha:     1.0,
+      born:      performance.now(),
       growDuration: GROW_DURATION + Math.random() * 80,
     });
 
