@@ -1,5 +1,5 @@
 import state from '../state.js';
-import { saveHistory } from '../core/history.js';
+import { saveHistory, undoMagic } from '../core/history.js';
 import { hexToRgb, hslToRgb } from '../core/color-utils.js';
 import { progressiveFloodFill } from '../core/fill.js';
 import { doBoom } from '../tools/explosion.js';
@@ -101,8 +101,13 @@ export function setRiveDockActive(active) {
 
 function _sizeCanvas(canvas) {
   var dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.round(window.innerWidth * dpr);
-  canvas.height = Math.round(window.innerHeight * dpr);
+  var area = state.canvasArea || document.getElementById('canvas-area');
+  var w = area.clientWidth;
+  var h = area.clientHeight;
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
 }
 
 function _bindViewModels() {
@@ -186,54 +191,35 @@ function _hexToArgb(hex) {
 }
 
 function _fireEffect(toolName, dropX, dropY) {
-  // dropX/dropY from DockVM are in viewport CSS coordinates (Rive canvas is full-screen).
-  // Effects expect canvas-area-relative coordinates — subtract the canvas area's left offset.
-  var rect = state.canvasArea.getBoundingClientRect();
-  var cx = dropX - rect.left;
-  var cy = dropY - rect.top;
-
+  // Rive canvas is now inside #canvas-area, so dropX/dropY are already
+  // canvas-area-relative — no offset subtraction needed.
   if (toolName === 'undo') {
     _doUndo();
   } else if (toolName === 'fill') {
-    _doFill(cx, cy);
+    _doFill(dropX, dropY);
   } else if (toolName === 'dynamite') {
-    doBoom(cx, cy);
+    doBoom(dropX, dropY);
   } else if (toolName === 'tornado') {
     _doTornadoWipe();
   }
 }
 
-// ── Tornado: canvas wipe only — Rive handles the ghost animation ──────────────
+// ── Tornado: straight vertical wipe — Rive handles the ghost animation ───────
 
 function _doTornadoWipe() {
   saveHistory();
   state.lastStrokePoints = null;
   var w = state.canvasW, h = state.canvasH;
-  var topW = Math.min(w * 0.22, 280);
-  var lean = Math.max(40, topW * 0.35);
-  var startX = -topW * 0.7, endX = w + topW * 0.9;
   var totalFrames = 130, frame = 0;
-
-  function clearWipe(cx) {
-    state.ctx.fillStyle = state.BG_CSS;
-    state.ctx.beginPath();
-    state.ctx.moveTo(-100, -10);
-    state.ctx.lineTo(cx + lean, -10);
-    state.ctx.lineTo(cx - lean, h + 10);
-    state.ctx.lineTo(-100, h + 10);
-    state.ctx.closePath();
-    state.ctx.fill();
-  }
 
   function animWipe() {
     var p = frame / totalFrames;
-    var cx = startX + (endX - startX) * p;
-    clearWipe(cx);
+    state.ctx.fillStyle = state.BG_CSS;
+    state.ctx.fillRect(0, 0, Math.ceil(w * p), h);
     frame++;
     if (frame < totalFrames) {
       requestAnimationFrame(animWipe);
     } else {
-      state.ctx.fillStyle = state.BG_CSS;
       state.ctx.fillRect(0, 0, w, h);
       _fireTrigger(_toolVMs.tornado, 'endWipe');
     }
@@ -253,84 +239,15 @@ function _doFill(dropX, dropY) {
   progressiveFloodFill(sx, sy, rgb, function() {});
 }
 
-// ── Undo: sparkle + canvas restore — Rive handles the ghost animation ─────────
+// ── Undo: delegates to undoMagic from history.js ─────────────────────────────
 
 function _doUndo() {
   if (_undoBusy || !state.undoSnapshot) return;
   if (state.undoSnapshot.width !== state.canvas.width || state.undoSnapshot.height !== state.canvas.height) return;
   _undoBusy = true;
-
-  var pts = state.lastStrokePoints;
-  var snap = document.createElement('canvas');
-  snap.width = state.canvas.width;
-  snap.height = state.canvas.height;
-  snap.getContext('2d').putImageData(state.undoSnapshot, 0, 0);
-  var current = state.ctx.getImageData(0, 0, state.canvas.width, state.canvas.height);
-  var snapW = state.canvasW, snapH = state.canvasH;
-
-  function commit() {
-    state.ctx.putImageData(state.undoSnapshot, 0, 0);
-    state.undoSnapshot = current;
-  }
-
-  var origins = [];
-  if (pts && pts.length >= 2) {
-    var step = Math.max(1, Math.floor(pts.length / 40));
-    for (var i = 0; i < pts.length; i += step) origins.push(pts[i]);
-    if (origins[origins.length - 1] !== pts[pts.length - 1]) origins.push(pts[pts.length - 1]);
-  } else {
-    origins.push({ x: state.canvasW / 2, y: state.canvasH / 2 });
-  }
-
-  var particles = [];
-  var COUNT = Math.min(60, origins.length * 3);
-  for (var i = 0; i < COUNT; i++) {
-    var o = origins[Math.floor(Math.random() * origins.length)];
-    var angle = Math.random() * Math.PI * 2;
-    var speed = 0.4 + Math.random() * 1.2;
-    particles.push({
-      x: o.x + (Math.random() - 0.5) * 8, y: o.y + (Math.random() - 0.5) * 8,
-      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-      r: 1.5 + Math.random() * 2.5, delay: Math.random() * 0.4, life: 0
-    });
-  }
-
-  var duration = 360, t0 = performance.now();
-  function frame() {
-    try {
-      var now = performance.now();
-      var t = Math.min(1, (now - t0) / duration);
-      var ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-      state.ctx.putImageData(current, 0, 0);
-      state.ctx.save(); state.ctx.globalAlpha = ease;
-      state.ctx.drawImage(snap, 0, 0, snapW, snapH);
-      state.ctx.restore();
-      state.ovCtx.clearRect(0, 0, snapW, snapH);
-      for (var i = 0; i < particles.length; i++) {
-        var p = particles[i];
-        if (t < p.delay) continue;
-        p.life += 0.045; p.x += p.vx; p.y += p.vy;
-        var alpha = Math.max(0, Math.sin(Math.min(p.life, 1) * Math.PI)) * (1 - ease);
-        if (alpha <= 0) continue;
-        state.ovCtx.save(); state.ovCtx.globalAlpha = alpha * 0.85;
-        state.ovCtx.fillStyle = state.color;
-        state.ovCtx.beginPath(); state.ovCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2); state.ovCtx.fill();
-        state.ovCtx.restore();
-      }
-      if (t < 1) {
-        requestAnimationFrame(frame);
-      } else {
-        state.ovCtx.clearRect(0, 0, snapW, snapH);
-        commit();
-        setTimeout(function() { _undoBusy = false; }, 180);
-      }
-    } catch (err) {
-      console.error('[rive-dock] undo error:', err);
-      commit();
-      _undoBusy = false;
-    }
-  }
-  frame();
+  undoMagic(function() {
+    setTimeout(function() { _undoBusy = false; }, 180);
+  });
 }
 
 // ── Helper: fire a named trigger from JS side ─────────────────────────────────

@@ -128,12 +128,9 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 #settings-overlay.visible { opacity: 1; pointer-events: auto; }
 
 /* ── Rive dock (experimental) ────────────────────────────────────────────── */
-#rive-dock-canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 200; display: none; }
+#rive-dock-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 200; display: none; }
 body[data-dock="rive"] #rive-dock-canvas { display: block; }
 body[data-dock="rive"] #drag-shelf { display: none !important; }
-/* Rails and their children must sit above the Rive canvas (z-index 200) */
-body[data-dock="rive"] #left-rail,
-body[data-dock="rive"] #right-rail { z-index: 250; }
 #debug-dock-toggle { position: absolute; top: 10px; right: 10px; z-index: 300; background: rgba(0,0,0,0.55); color: rgba(255,255,255,0.85); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; padding: 5px 10px; font-family: 'Fredoka', sans-serif; font-size: 12px; cursor: pointer; outline: none; appearance: none; -webkit-appearance: none; }
 #debug-dock-toggle option { background: #1a1a2e; }
 
@@ -243,6 +240,7 @@ body[data-dock="rive"] #right-rail { z-index: 250; }
 <div id="canvas-area">
   <canvas id="c"></canvas>
   <canvas id="overlay"></canvas>
+  <canvas id="rive-dock-canvas"></canvas>
   <div id="resize-overlay">
     <div id="mini-browser">
       <div id="mini-browser-bar">
@@ -349,7 +347,6 @@ body[data-dock="rive"] #right-rail { z-index: 250; }
   </div>
 </div>
 
-<canvas id="rive-dock-canvas"></canvas>
 <script src="https://unpkg.com/@rive-app/canvas"></script>
 <script type="module" src="src/main.js"></script>
 </body>
