@@ -51,25 +51,24 @@ export function initRiveDock() {
   });
 
   // ── Event relay ────────────────────────────────────────────────────────────
-  // The Rive canvas is on top (z-index 200) with pointer-events: auto when active.
-  // Rive's own listeners handle dock tool interactions. For events that land outside
-  // dock tools (drawing area), we relay to the drawing canvas via synthetic events.
-  //
-  // Detection: after each pointerdown, wait one rAF so Rive can advance and fire
-  // the `pressed` trigger.on() callback (which sets _riveCapturing). If it didn't
-  // fire, this was a drawing press → relay mousedown to drawing canvas.
+  // The Rive canvas is on top with pointer-events: auto when active.
+  // On pointerdown we do an immediate bounds check against dockW/dockH/leftPlacement/
+  // bottomPlacement from DockVM. If the press is outside the dock, relay to the
+  // drawing canvas straight away — no rAF delay.
 
   canvas.addEventListener('pointerdown', function(e) {
     if (!_active) return;
-    _riveCapturing = false;
-    var ex = e.clientX, ey = e.clientY;
-    requestAnimationFrame(function() {
-      if (!_riveCapturing) {
-        state.canvas.dispatchEvent(new MouseEvent('mousedown', {
-          clientX: ex, clientY: ey, bubbles: false
-        }));
-      }
-    });
+    var rect = canvas.getBoundingClientRect();
+    var px = e.clientX - rect.left;
+    var py = e.clientY - rect.top;
+    if (_isInDock(px, py)) {
+      _riveCapturing = true;
+    } else {
+      _riveCapturing = false;
+      state.canvas.dispatchEvent(new MouseEvent('mousedown', {
+        clientX: e.clientX, clientY: e.clientY, bubbles: false
+      }));
+    }
   });
 
   canvas.addEventListener('pointermove', function(e) {
@@ -110,6 +109,21 @@ function _sizeCanvas(canvas) {
   canvas.style.height = h + 'px';
 }
 
+// Returns true if canvas-area-relative point (px, py) is inside the dock.
+// Uses dockW/dockH/leftPlacement/bottomPlacement outputs from DockVM.
+function _isInDock(px, py) {
+  if (!_dockVM) return false;
+  var dw = _dockVM.number('dockW');
+  var dh = _dockVM.number('dockH');
+  var lp = _dockVM.number('leftPlacement');
+  var bp = _dockVM.number('bottomPlacement');
+  if (!dw || !dh || !lp || !bp) return false;
+  var w = dw.value, h = dh.value, left = lp.value, bottom = bp.value;
+  var dockTop = state.canvasH - bottom - h;
+  var dockBottom = state.canvasH - bottom;
+  return px >= left && px <= left + w && py >= dockTop && py <= dockBottom;
+}
+
 function _bindViewModels() {
   if (_bound) return;
   _bound = true;
@@ -128,19 +142,6 @@ function _bindViewModels() {
     var inst = _dockVM.viewModel(name);
     if (!inst) { console.warn('[rive-dock] missing VM instance for:', name); return; }
     _toolVMs[name] = inst;
-
-    // Set _riveCapturing when the tool is pressed (Rive Listener fires pressed trigger)
-    var pressedTrig = inst.trigger('pressed');
-    if (pressedTrig && pressedTrig.on) {
-      pressedTrig.on(function() {
-        _riveCapturing = true;
-        console.log('[rive-dock] tool pressed:', name);
-      });
-    }
-    var releaseTrig = inst.trigger('release');
-    if (releaseTrig && releaseTrig.on) {
-      releaseTrig.on(function() { _riveCapturing = false; });
-    }
 
     // Listen for effect output triggers
     var effectTrig = inst.trigger(effectTriggerNames[name]);
