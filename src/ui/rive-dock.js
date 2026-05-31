@@ -41,13 +41,14 @@ export function initRiveDock() {
     }
   });
 
-  // Sync fill colour on every frame when state.color changes
+  // Per-frame sync: fill colour + dock centering
   var _lastColor = '';
   _riveInst.on(window.rive.EventType.Advance, function() {
     if (state.color !== _lastColor) {
       _syncFillColor();
       _lastColor = state.color;
     }
+    _centerDock();
   });
 
   // ── Event relay ────────────────────────────────────────────────────────────
@@ -173,6 +174,14 @@ function _pushCanvasSize() {
   var ch = _dockVM.number('canvasH');
   if (cw) cw.value = state.canvasW;
   if (ch) ch.value = state.canvasH;
+}
+
+function _centerDock() {
+  if (!_dockVM) return;
+  var dwProp = _dockVM.number('dockW');
+  var lpProp = _dockVM.number('leftPlacement');
+  if (!dwProp || !lpProp || dwProp.value <= 0) return;
+  lpProp.value = (state.canvasW - dwProp.value) / 2;
 }
 
 function _syncFillColor() {
