@@ -110,6 +110,64 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 .rect-sub-btn.active:active, .ellipse-sub-btn.active:active { transform: scale(1.02); }
 .rect-sub-btn svg, .ellipse-sub-btn svg { width: 100%; height: 100%; pointer-events: none; display: block; }
 .rect-sub-btn img, .ellipse-sub-btn img { width: 100%; height: 100%; image-rendering: auto; pointer-events: none; display: block; }
+
+/* ── Settings button ─────────────────────────────────────────────────────── */
+#settings-btn { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,0.10); border: 2px dashed rgba(255,255,255,0.35); cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0; user-select: none; color: rgba(255,255,255,0.75); transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.18s cubic-bezier(0.34,1.56,0.64,1); }
+#settings-btn:hover { background: rgba(255,255,255,0.18); color: rgba(255,255,255,1); }
+#settings-btn:active { transform: scale(0.92); }
+#settings-btn .settings-cog { font-size: 22px; position: relative; z-index: 1; transition: transform 0.6s cubic-bezier(0.34,1.56,0.64,1); display: inline-block; font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; }
+#settings-btn:hover .settings-cog { transform: rotate(60deg); }
+#settings-btn.holding .settings-cog { transform: rotate(360deg); transition: transform 600ms linear; }
+.settings-ring { position: absolute; top: -7px; left: -7px; width: 60px; height: 60px; transform: rotate(-90deg); pointer-events: none; overflow: visible; }
+.settings-ring-track { fill: none; stroke: rgba(255,255,255,0.12); stroke-width: 2.5; }
+.settings-ring-fill { fill: none; stroke: rgba(255,255,255,0.88); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 176; stroke-dashoffset: 176; transition: stroke-dashoffset 0s; }
+#settings-btn.holding .settings-ring-fill { stroke-dashoffset: 0; transition: stroke-dashoffset 600ms linear; }
+
+/* ── Settings overlay ────────────────────────────────────────────────────── */
+#settings-overlay { position: fixed; inset: 0; z-index: 900; background: rgba(8,8,24,0.42); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+#settings-overlay.visible { opacity: 1; pointer-events: auto; }
+
+/* ── Settings panel ──────────────────────────────────────────────────────── */
+#settings-panel { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%) scale(0.88); z-index: 901; width: min(420px, calc(100vw - 48px)); max-height: calc(100vh - 80px); overflow-y: auto; background: rgba(252,253,255,0.94); border: 1.5px solid rgba(255,255,255,0.95); border-radius: 30px; padding: 26px 26px 30px; box-shadow: 0 24px 72px rgba(0,0,0,0.30), 0 0 0 1px rgba(255,255,255,0.55); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); opacity: 0; pointer-events: none; transition: opacity 0.32s ease, transform 0.40s cubic-bezier(0.34,1.56,0.64,1); font-family: 'Fredoka', sans-serif; color: #1a1a2e; }
+#settings-panel.visible { opacity: 1; pointer-events: auto; transform: translate(-50%,-50%) scale(1); }
+.spanel-close { position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(0,0,0,0.07); cursor: pointer; display: flex; align-items: center; justify-content: center; color: rgba(26,26,46,0.5); transition: background 0.15s, color 0.15s, transform 0.18s cubic-bezier(0.34,1.56,0.64,1); }
+.spanel-close:hover { background: rgba(0,0,0,0.12); color: rgba(26,26,46,0.85); }
+.spanel-close:active { transform: scale(0.88); }
+.spanel-close .mir { font-size: 18px; }
+
+/* ── Settings tabs ───────────────────────────────────────────────────────── */
+.stabs { display: flex; gap: 6px; background: rgba(0,0,0,0.055); border-radius: 16px; padding: 4px; margin-bottom: 22px; }
+.stab { flex: 1; border: none; cursor: pointer; padding: 10px 0; border-radius: 12px; font-family: 'Fredoka', sans-serif; font-size: 15px; font-weight: 600; color: rgba(26,26,46,0.45); background: transparent; transition: background 0.22s ease, color 0.22s ease, box-shadow 0.22s ease, transform 0.18s cubic-bezier(0.34,1.56,0.64,1); letter-spacing: 0.01em; }
+.stab.active { background: var(--accent); color: white; box-shadow: 0 3px 10px rgba(108,184,182,0.40); }
+.stab:active { transform: scale(0.95); }
+
+/* ── Settings pages ──────────────────────────────────────────────────────── */
+.spage { display: none; }
+.spage.active { display: block; }
+
+/* About page */
+.sabout-logo-wrap { display: flex; justify-content: center; margin-bottom: 16px; }
+.sabout-logo { width: 90px; height: 90px; border-radius: 50%; background: conic-gradient(from 180deg, #ff5fa2 0%, #c43dff 18%, #6f5fff 32%, #3fa6ff 47%, #3fff8a 60%, #ffe53f 73%, #ff7f3f 83%, #ff3f3f 92%, #ff5fa2 100%); display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 22px rgba(0,0,0,0.22), inset 0 0 0 3px rgba(255,255,255,0.30); position: relative; }
+.sabout-logo::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: rgba(255,255,255,0.12); }
+.sabout-logo .mir { font-size: 40px; color: white; position: relative; z-index: 1; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 48; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25)); }
+.sabout-name { text-align: center; font-size: 30px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 8px; background: linear-gradient(135deg, #1a1a2e 0%, #2d6a68 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.sabout-blurb { text-align: center; font-size: 15px; font-weight: 500; color: rgba(26,26,46,0.58); line-height: 1.55; padding: 0 8px; margin-bottom: 22px; }
+.sabout-divider { height: 1px; background: rgba(0,0,0,0.07); border-radius: 1px; margin: 0 0 16px; }
+.sabout-footer { text-align: center; font-size: 12px; color: rgba(26,26,46,0.32); font-weight: 500; letter-spacing: 0.02em; }
+
+/* iPad instructions page */
+.sipad-title { font-size: 17px; font-weight: 700; color: rgba(26,26,46,0.75); margin-bottom: 14px; letter-spacing: 0.01em; }
+.sipad-steps { display: flex; flex-direction: column; gap: 10px; }
+.sipad-step { display: flex; align-items: center; gap: 14px; background: rgba(0,0,0,0.035); border-radius: 18px; padding: 13px 15px; }
+.sipad-step-num { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.sipad-step-num .mir { font-size: 20px; color: white; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.sipad-step-num.s1 { background: linear-gradient(135deg, #3fa6ff, #6f5fff); }
+.sipad-step-num.s2 { background: linear-gradient(135deg, #c43dff, #6f5fff); }
+.sipad-step-num.s3 { background: linear-gradient(135deg, #ff7f3f, #ff5fa2); }
+.sipad-step-num.s4 { background: linear-gradient(135deg, #3fff8a, #3fa6ff); }
+.sipad-step-text { flex: 1; min-width: 0; }
+.sipad-step-label { font-size: 15px; font-weight: 700; color: #1a1a2e; line-height: 1.2; margin-bottom: 2px; }
+.sipad-step-desc { font-size: 13px; font-weight: 500; color: rgba(26,26,46,0.52); line-height: 1.4; }
 </style>
 </head>
 <body>
@@ -134,6 +192,13 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
     <button id="tool-overflow-down" class="tool-overflow-btn" aria-label="Scroll down"><span class="mir">expand_more</span></button>
   </div>
   <button id="mirror-toggle" title="Mirror"><img src="custom-icons/Mirror.svg" alt="Mirror"></button>
+  <button id="settings-btn" title="Hold for settings">
+    <svg class="settings-ring" viewBox="0 0 60 60" aria-hidden="true">
+      <circle class="settings-ring-track" cx="30" cy="30" r="28"/>
+      <circle class="settings-ring-fill" cx="30" cy="30" r="28"/>
+    </svg>
+    <span class="mir settings-cog">settings</span>
+  </button>
   <button id="save-btn"><span class="mir" style="font-size:22px;">download</span></button>
 </div>
 
@@ -205,6 +270,59 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
     <span class="mir size-warning-icon">aspect_ratio</span>
     <div class="size-warning-title">Make the window bigger!</div>
     <div class="size-warning-sub">This app requires a larger window or screen.</div>
+  </div>
+</div>
+
+<div id="settings-overlay"></div>
+<div id="settings-panel">
+  <button class="spanel-close" aria-label="Close"><span class="mir">close</span></button>
+  <div class="stabs">
+    <button class="stab active">About</button>
+    <button class="stab">Add to iPad</button>
+  </div>
+
+  <div class="spage active">
+    <div class="sabout-logo-wrap">
+      <div class="sabout-logo"><span class="mir">brush</span></div>
+    </div>
+    <div class="sabout-name">Drawing App</div>
+    <div class="sabout-blurb">Made for little hands and big imaginations. Draw, create, and explore colour to your heart's content!</div>
+    <div class="sabout-divider"></div>
+    <div class="sabout-footer">Made with love &nbsp;·&nbsp; © 2025</div>
+  </div>
+
+  <div class="spage">
+    <div class="sipad-title">Add to your home screen</div>
+    <div class="sipad-steps">
+      <div class="sipad-step">
+        <div class="sipad-step-num s1"><span class="mir">language</span></div>
+        <div class="sipad-step-text">
+          <div class="sipad-step-label">Open in Safari</div>
+          <div class="sipad-step-desc">This app works best in Safari on your iPad.</div>
+        </div>
+      </div>
+      <div class="sipad-step">
+        <div class="sipad-step-num s2"><span class="mir">ios_share</span></div>
+        <div class="sipad-step-text">
+          <div class="sipad-step-label">Tap the Share button</div>
+          <div class="sipad-step-desc">The box-with-arrow icon in Safari's toolbar.</div>
+        </div>
+      </div>
+      <div class="sipad-step">
+        <div class="sipad-step-num s3"><span class="mir">add_box</span></div>
+        <div class="sipad-step-text">
+          <div class="sipad-step-label">Tap "Add to Home Screen"</div>
+          <div class="sipad-step-desc">Scroll down in the share sheet to find it.</div>
+        </div>
+      </div>
+      <div class="sipad-step">
+        <div class="sipad-step-num s4"><span class="mir">check_circle</span></div>
+        <div class="sipad-step-text">
+          <div class="sipad-step-label">Tap Add — you're done!</div>
+          <div class="sipad-step-desc">The app opens full screen, just like a real app.</div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
