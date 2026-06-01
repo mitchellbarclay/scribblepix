@@ -1,5 +1,6 @@
 import state from '../state.js';
 import { commitAllSplatterParticles } from '../tools/bubble-brush.js';
+import { updateActiveToolPin } from './toolbar-overflow.js';
 
 var rectSubmenu, ellipseSubmenu;
 
@@ -31,6 +32,7 @@ export function initToolbar() {
       state.tool = btn.dataset.tool;
       document.querySelectorAll('[data-tool]').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
+      updateActiveToolPin();
       if (state.tool === 'rect') {
         hideEllipseSubmenu();
         if (rectSubmenu.classList.contains('visible')) { hideRectSubmenu(); } else { showRectSubmenu(); }

@@ -16,20 +16,33 @@
 @property --accent-dark { syntax: '<color>'; initial-value: #2d6a68; inherits: true; }
 body { background: linear-gradient(135deg, var(--bg-c1) 0%, var(--bg-c2) 50%, var(--bg-c3) 100%); font-family: 'Fredoka', sans-serif; overflow: hidden; height: 100vh; display: flex; flex-direction: row; transition: --bg-c1 0.15s linear, --bg-c2 0.15s linear, --bg-c3 0.15s linear, --rail-bg 0.15s linear, --accent 0.15s linear; }
 #left-rail, #right-rail { width: 84px; flex-shrink: 0; background: var(--rail-bg); display: flex; flex-direction: column; align-items: center; padding: 18px 0; gap: 16px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-#tool-pill { background: transparent; display: flex; flex-direction: column; gap: 5px; align-items: center; flex: 1 1 0; min-height: 0; width: 100%; }
-#tool-scroll-viewport { flex: 1 1 0; min-height: 0; overflow: hidden; width: 100%; display: flex; flex-direction: column; align-items: center; padding: 6px 0; }
-#tool-list { display: flex; flex-direction: column; gap: 14px; align-items: center; padding: 2px 0; will-change: transform; }
-.tool-overflow-btn { width: 32px; height: 0; overflow: hidden; border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.10); background: rgba(255,255,255,0.72); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; flex-shrink: 0; transition: height 0.22s cubic-bezier(0.34,1.56,0.64,1), opacity 0.18s ease; color: rgba(30,60,70,0.80); box-shadow: 0 2px 6px rgba(0,0,0,0.18); }
-.tool-overflow-btn.visible { height: 32px; opacity: 1; pointer-events: auto; }
+#tool-pill { background: transparent; display: flex; flex-direction: column; gap: 8px; align-items: center; flex: 1 1 0; min-height: 0; width: 100%; }
+#tool-scroll-section { position: relative; min-height: 0; width: calc(100% - 14px); display: flex; flex-direction: column; align-items: center; background: rgba(0,0,0,0.05); border-radius: 26px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.10); }
+#tool-scroll-viewport { min-height: 0; overflow: hidden; width: 100%; display: flex; flex-direction: column; align-items: center; padding: 10px 0; }
+#tool-list { display: flex; flex-direction: column; gap: 14px; align-items: center; will-change: transform; }
+.tool-overflow-btn { position: absolute; left: 50%; margin-left: -19px; z-index: 2; width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.10); background: rgba(255,255,255,0.88); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.34,1.56,0.64,1); color: rgba(30,60,70,0.85); box-shadow: 0 2px 6px rgba(0,0,0,0.22); }
+#tool-overflow-up { top: 14px; }
+#tool-overflow-down { bottom: 14px; }
+.tool-overflow-btn.visible { opacity: 1; pointer-events: auto; }
+.tool-btn.slot-hidden { opacity: 0; pointer-events: none; }
 .tool-overflow-btn:hover { background: rgba(255,255,255,0.90); color: rgba(30,60,70,1); }
 .tool-overflow-btn:active { transform: scale(0.88); }
 .tool-overflow-btn .mir { font-size: 20px; }
-.tool-btn { width: 46px; height: 46px; border-radius: 50%; background: transparent; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; transition: background 0.15s, transform 0.18s cubic-bezier(0.34,1.56,0.64,1); flex-shrink: 0; user-select: none; }
+#active-tool-pin { width: 52px; height: 0; overflow: hidden; border-radius: 50%; background: var(--accent); box-shadow: inset 0 0 0 2px var(--accent-dark), 0 3px 10px rgba(0,0,0,0.28); border: none; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; flex-shrink: 0; transition: height 0.22s cubic-bezier(0.34,1.56,0.64,1), opacity 0.18s ease, transform 0.18s cubic-bezier(0.34,1.56,0.64,1); }
+#active-tool-pin.visible { height: 52px; opacity: 1; pointer-events: auto; }
+#active-tool-pin.eraser-active { background: #ffffff; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.18), 0 3px 10px rgba(0,0,0,0.28); }
+#active-tool-pin img { width: 82%; height: 82%; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+#active-tool-pin:active { transform: scale(0.90); }
+.tool-btn { width: 46px; height: 46px; border-radius: 50%; background: transparent; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; transition: background 0.15s, transform 0.18s cubic-bezier(0.34,1.56,0.64,1), opacity 0.18s ease; flex-shrink: 0; user-select: none; }
 .tool-btn.active { background: var(--accent); box-shadow: inset 0 0 0 2px var(--accent-dark); transform: scale(1.22); }
 .tool-btn.active[data-tool="eraser"] { background: #ffffff; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.18); }
 .tool-btn img { width: 100%; height: 100%; image-rendering: auto; pointer-events: none; user-select: none; -webkit-user-drag: none; }
 .tool-btn:active { transform: scale(0.92); }
 .tool-btn.active:active { transform: scale(1.1); }
+/* When the active-tool pin is showing, the in-flow selected tool is a subtle ring at normal size — the pin is the primary indicator. */
+#tool-pill.pin-active .tool-btn.active { background: transparent; box-shadow: inset 0 0 0 2px var(--accent); transform: none; }
+#tool-pill.pin-active .tool-btn.active[data-tool="eraser"] { background: transparent; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.20); }
+#tool-pill.pin-active .tool-btn.active:active { transform: scale(0.92); }
 #mirror-toggle { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,0.10); border: 2px dashed rgba(255,255,255,0.35); cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; transition: background 0.15s, transform 0.18s cubic-bezier(0.34,1.56,0.64,1), border-color 0.15s; flex-shrink: 0; user-select: none; }
 #mirror-toggle img { width: 100%; height: 100%; image-rendering: auto; pointer-events: none; user-select: none; -webkit-user-drag: none; }
 #mirror-toggle.active { background: var(--accent); border: 2px solid var(--accent-dark); box-shadow: inset 0 0 0 2px var(--accent-dark); transform: scale(1.14); }
@@ -186,9 +199,11 @@ body[data-dock="rive"] #drag-shelf { display: none !important; }
 
 <div id="left-rail">
   <div id="tool-pill">
-    <button id="tool-overflow-up" class="tool-overflow-btn" aria-label="Scroll up"><span class="mir">expand_less</span></button>
-    <div id="tool-scroll-viewport">
-      <div id="tool-list">
+    <button id="active-tool-pin" aria-label="Active tool"><img src="" alt=""></button>
+    <div id="tool-scroll-section">
+      <button id="tool-overflow-up" class="tool-overflow-btn" aria-label="Scroll up"><span class="mir">expand_less</span></button>
+      <div id="tool-scroll-viewport">
+        <div id="tool-list">
         <button class="tool-btn active" data-tool="pencil"><img src="custom-icons/Pen.svg" alt=""></button>
         <button class="tool-btn" data-tool="eraser"><img src="custom-icons/Eraser.svg" alt=""></button>
         <button class="tool-btn" data-tool="splatter"><img src="custom-icons/Bubbles.svg" alt=""></button>
@@ -199,9 +214,10 @@ body[data-dock="rive"] #drag-shelf { display: none !important; }
         <button class="tool-btn" data-tool="pipe"><img src="custom-icons/Pipe.svg" alt=""></button>
         <button class="tool-btn" data-tool="rect"><img src="custom-icons/rect_outline.svg" alt=""></button>
         <button class="tool-btn" data-tool="ellipse"><img src="custom-icons/ellipse_outline.svg" alt=""></button>
+        </div>
       </div>
+      <button id="tool-overflow-down" class="tool-overflow-btn" aria-label="Scroll down"><span class="mir">expand_more</span></button>
     </div>
-    <button id="tool-overflow-down" class="tool-overflow-btn" aria-label="Scroll down"><span class="mir">expand_more</span></button>
   </div>
   <button id="mirror-toggle" title="Mirror"><img src="custom-icons/Mirror.svg" alt="Mirror"></button>
   <button id="settings-btn" title="Hold for settings">
