@@ -113,14 +113,17 @@ function _sizeCanvas(canvas) {
 
 // Returns true if canvas-area-relative point (px, py) is inside the dock.
 // Uses dockW/dockH/leftPlacement/bottomPlacement outputs from DockVM.
+// Defaults to true (assume in dock) when bounds are unknown/zero — this
+// prevents accidental mousedown relays that draw a brush stamp before a fill.
 function _isInDock(px, py) {
-  if (!_dockVM) return false;
+  if (!_dockVM) return true;
   var dw = _dockVM.number('dockW');
   var dh = _dockVM.number('dockH');
   var lp = _dockVM.number('leftPlacement');
   var bp = _dockVM.number('bottomPlacement');
-  if (!dw || !dh || !lp || !bp) return false;
+  if (!dw || !dh || !lp || !bp) return true;
   var w = dw.value, h = dh.value, left = lp.value, bottom = bp.value;
+  if (w <= 0 || h <= 0) return true;
   var dockTop = state.canvasH - bottom - h;
   var dockBottom = state.canvasH - bottom;
   return px >= left && px <= left + w && py >= dockTop && py <= dockBottom;
