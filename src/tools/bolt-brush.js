@@ -15,8 +15,11 @@ var SKEL_STEP = 5;        // path resample step (px) — small, so curves surviv
 function jagAmp() { return Math.max(12, state.brushSize * 1.8); } // jag size
 var JAG_WL = 46;          // base jag wavelength (px); each octave halves it
 var JAG_OCTAVES = 3;      // layers of detail: big bends + finer crackle
-var MORPH_RATE = 0.0045;  // shimmer speed (noise units per ms), constant in time
+var MORPH_RATE = 0.05;    // shimmer speed (noise units per ms), constant in time
 var SETTLE_MS = 1000;     // each point settles over this long after it's drawn
+// Distance over which the jag eases to zero at the leading tip, so the lit head
+// of the bolt sits exactly on the cursor instead of floating off to one side.
+function headTaper() { return Math.max(30, jagAmp()); }
 
 // How far a point's animation phase has advanced as a function of its age. The
 // phase drifts at MORPH_RATE when fresh and eases linearly to a standstill over
@@ -94,12 +97,14 @@ function rebuildSkel(bs) {
 function buildShape(bs, now) {
   var skel = bs.skel, s = bs.sArr, tA = bs.tArr;
   if (!skel || skel.length < 2) return null;
+  var L = s[s.length-1], taper = headTaper();
   var out = [];
   for (var j = 0; j < skel.length; j++) {
     var a = skel[Math.max(0,j-1)], b = skel[Math.min(skel.length-1,j+1)];
     var tx = b.x-a.x, ty = b.y-a.y, tl = Math.hypot(tx,ty)||1;
     var nx = -ty/tl, ny = tx/tl;
     var o = jagOffset(s[j], settlePhase(now - tA[j]), bs.seed);
+    o *= Math.min(1, (L - s[j]) / taper); // ease jag to 0 at the leading tip
     out.push({x: skel[j].x + nx*o, y: skel[j].y + ny*o});
   }
   return out;
