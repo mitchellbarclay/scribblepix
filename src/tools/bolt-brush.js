@@ -16,7 +16,7 @@ function jagAmp() { return Math.max(12, state.brushSize * 1.8); } // jag size
 var JAG_WL = 46;          // base jag wavelength (px); each octave halves it
 var JAG_OCTAVES = 3;      // layers of detail: big bends + finer crackle
 var MORPH_RATE = 0.01;    // crackle speed (temporal cells per ms), constant in time
-var SETTLE_MS = 1000;     // each point settles over this long after it's drawn
+var SETTLE_MS = 400;      // each point settles over this long after it's drawn
 // Distance over which the jag eases to zero at the leading tip, so the lit head
 // of the bolt sits exactly on the cursor instead of floating off to one side.
 function headTaper() { return Math.max(30, jagAmp()); }
@@ -126,7 +126,7 @@ function renderBolt(ctx, pts, col) {
   if (!pts || pts.length < 2) return;
   var w = Math.max(2, state.brushSize*0.70);
   ctx.save();
-  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.lineCap = 'round'; ctx.lineJoin = 'miter'; ctx.miterLimit = 6; // sharp electric corners
   function trace() {
     ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
     for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
