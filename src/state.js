@@ -97,6 +97,11 @@ const state = {
   firePrevY: 0,
   fireAnimFrame: null,
   fireLiveStamps: [],
+
+  // 3D tube brush
+  threeStroke: null,
+  mirrorThreeStroke: null,
+  threeAnimFrame: null,
 };
 
 export default state;

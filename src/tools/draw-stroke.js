@@ -8,6 +8,7 @@ import { drawPipeStroke } from './pipes-brush.js';
 import { drawFireStroke } from './fire-brush.js';
 import { drawRectStroke } from './rect-tool.js';
 import { drawEllipseStroke } from './ellipse-tool.js';
+import { drawThreeStroke } from './threed-brush.js';
 
 export function currentColor() {
   if (state.rainbowMode) { state.rainbowHue = (state.rainbowHue+3)%360; return 'hsl('+state.rainbowHue+',100%,50%)'; }
@@ -77,5 +78,16 @@ export function drawStroke(x, y) {
     drawRectStroke(x, y, c);
   } else if (state.tool === 'ellipse') {
     drawEllipseStroke(x, y, c);
+  } else if (state.tool === 'threed') {
+    drawThreeStroke(x, y, c);
+    if (state.mirrorMode) {
+      var _savLastX3 = state.lastX, _savTS = state.threeStroke;
+      state.lastX = state.canvasW - _savLastX3;
+      state.threeStroke = state.mirrorThreeStroke;
+      drawThreeStroke(state.canvasW - x, y, c);
+      state.mirrorThreeStroke = state.threeStroke;
+      state.threeStroke = _savTS;
+      state.lastX = _savLastX3;
+    }
   }
 }

@@ -1,0 +1,18 @@
+<svg width="78" height="78" viewBox="0 0 78 78" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- White border pass -->
+  <polygon points="39,13 58,24 39,35 20,24" fill="#9EE3FF" stroke="white" stroke-width="7" stroke-linejoin="round"/>
+  <polygon points="20,24 39,35 39,57 20,46" fill="#5BC4E8" stroke="white" stroke-width="7" stroke-linejoin="round"/>
+  <polygon points="58,24 58,46 39,57 39,35" fill="#2E90C8" stroke="white" stroke-width="7" stroke-linejoin="round"/>
+  <!-- Colored fills -->
+  <polygon points="39,13 58,24 39,35 20,24" fill="#9EE3FF"/>
+  <polygon points="20,24 39,35 39,57 20,46" fill="#5BC4E8"/>
+  <polygon points="58,24 58,46 39,57 39,35" fill="#2E90C8"/>
+  <!-- Top face highlight -->
+  <polygon points="39,17 54,25.5 39,32 24,25.5" fill="white" opacity="0.32"/>
+  <!-- Specular dot on left face -->
+  <circle cx="28" cy="30" r="3.5" fill="white" opacity="0.38"/>
+  <!-- Black outlines -->
+  <polygon points="39,13 58,24 39,35 20,24" stroke="black" stroke-width="3" stroke-linejoin="round"/>
+  <polygon points="20,24 39,35 39,57 20,46" stroke="black" stroke-width="3" stroke-linejoin="round"/>
+  <polygon points="58,24 58,46 39,57 39,35" stroke="black" stroke-width="3" stroke-linejoin="round"/>
+</svg>

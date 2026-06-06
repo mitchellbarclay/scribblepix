@@ -10,6 +10,7 @@ import { finalizeFireStroke } from './tools/fire-brush.js';
 import { finalizeRectStroke, cancelRectStroke } from './tools/rect-tool.js';
 import { finalizeEllipseStroke, cancelEllipseStroke } from './tools/ellipse-tool.js';
 import { finalizePipeStroke } from './tools/pipes-brush.js';
+import { finalizeThreeStroke } from './tools/threed-brush.js';
 import { initColorPicker, onColorMove, onColorRelease } from './ui/color-picker.js';
 import { initBrushSlider, onSliderMove, onSliderRelease } from './ui/brush-slider.js';
 import { initToolbar, hideRectSubmenu, hideEllipseSubmenu } from './ui/toolbar.js';
@@ -39,7 +40,7 @@ new ResizeObserver(resize).observe(state.canvasArea);
 
 // Canvas drawing event handlers
 function clearBrushPreview() {
-  if (state.tool === 'bolt' || state.tool === 'fire' || state.tool === 'pipe') state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
+  if (state.tool === 'bolt' || state.tool === 'fire' || state.tool === 'pipe' || state.tool === 'threed') state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
   if (state.tool === 'rect' && !state.rectBouncing) state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
   if (state.tool === 'ellipse' && !state.ellipseBouncing) state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
 }
@@ -53,6 +54,7 @@ state.canvas.addEventListener('mousedown', function(e) {
   state.mirrorFlowerStroke = null;
   state.mirrorBoltStroke = null;
   state.mirrorPipeStroke = null;
+  state.mirrorThreeStroke = null;
   state.lastStrokePoints = [{x:x, y:y}];
   if (state.mirrorMode) state.lastStrokePoints.push({x: state.canvasW-x, y: y});
   state.lastStrokeRadius = state.tool === 'eraser' ? state.brushSize*1.6
@@ -64,6 +66,7 @@ state.canvas.addEventListener('mousedown', function(e) {
                          : state.tool === 'pipe' ? state.brushSize*1.8
                          : state.tool === 'rect' ? 0
                          : state.tool === 'ellipse' ? 0
+                         : state.tool === 'threed' ? state.brushSize*0.5
                          : state.brushSize*1.1;
   state.lastStrokeTool = state.tool;
   state.painting = true; state.lastX = x; state.lastY = y;
@@ -88,14 +91,14 @@ state.canvas.addEventListener('mousemove', function(e) {
 state.canvas.addEventListener('mouseup', function() {
   state.painting = false;
   finalizeVineStrokeV2(); finalizeFlowerStroke(); finalizeBoltStroke(); finalizeFireStroke();
-  finalizeRectStroke(); finalizeEllipseStroke(); finalizePipeStroke();
+  finalizeRectStroke(); finalizeEllipseStroke(); finalizePipeStroke(); finalizeThreeStroke();
   clearBrushPreview();
 });
 
 state.canvas.addEventListener('mouseleave', function() {
   state.painting = false;
   finalizeVineStrokeV2(); finalizeFlowerStroke(); finalizeBoltStroke(); finalizeFireStroke();
-  cancelRectStroke(); cancelEllipseStroke(); finalizePipeStroke();
+  cancelRectStroke(); cancelEllipseStroke(); finalizePipeStroke(); finalizeThreeStroke();
   clearBrushPreview();
 });
 
