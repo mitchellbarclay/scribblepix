@@ -15,7 +15,7 @@ var SKEL_STEP = 5;        // path resample step (px) — small, so curves surviv
 function jagAmp() { return Math.max(12, state.brushSize * 1.8); } // jag size
 var JAG_WL = 46;          // base jag wavelength (px); each octave halves it
 var JAG_OCTAVES = 3;      // layers of detail: big bends + finer crackle
-var MORPH_RATE = 0.05;    // shimmer speed (noise units per ms), constant in time
+var MORPH_RATE = 0.01;    // crackle speed (temporal cells per ms), constant in time
 var SETTLE_MS = 1000;     // each point settles over this long after it's drawn
 // Distance over which the jag eases to zero at the leading tip, so the lit head
 // of the bolt sits exactly on the cursor instead of floating off to one side.
@@ -31,22 +31,29 @@ function settlePhase(age) {
   return MORPH_RATE * (age - age*age / (2*SETTLE_MS));
 }
 
-// --- Coherent value noise ---------------------------------------------------
-// 1D value noise in [-1,1], smooth and deterministic in both inputs. Sampling
-// it at a slowly drifting phase gives a gentle shimmer; sampling the same arc
-// position always returns the same base shape, so the bolt is stable in space.
+// --- Value noise (2D: space × time) -----------------------------------------
+// Deterministic noise in [-1,1] over a spatial cell and a temporal cell.
+// Interpolation is LINEAR in space (sharp, angular jags — like lightning, not a
+// rounded string) but SMOOTH in time (the crackle flickers without jerking).
+// Time is its own axis, so the pattern flickers *in place* as the phase advances
+// rather than sliding along the path.
 function fract(x) { return x - Math.floor(x); }
-function hash1(n, seed) { return fract(Math.sin(n*12.9898 + seed*78.233) * 43758.5453) * 2 - 1; }
-function vnoise(u, seed) {
-  var i = Math.floor(u), f = u - i, t = f*f*(3-2*f);
-  return hash1(i, seed) + (hash1(i+1, seed) - hash1(i, seed)) * t;
+function hash2(xi, ti, seed) {
+  return fract(Math.sin(xi*12.9898 + ti*31.416 + seed*78.233) * 43758.5453) * 2 - 1;
+}
+function vnoise(x, tphase, seed) {
+  var xi = Math.floor(x), xf = x - xi;
+  var ti = Math.floor(tphase), tf = tphase - ti; tf = tf*tf*(3-2*tf);
+  var a = hash2(xi,ti,seed)   + (hash2(xi+1,ti,seed)   - hash2(xi,ti,seed))   * xf;
+  var b = hash2(xi,ti+1,seed) + (hash2(xi+1,ti+1,seed) - hash2(xi,ti+1,seed)) * xf;
+  return a + (b - a) * tf;
 }
 // Perpendicular offset at arc length s, animation phase, and stroke seed.
-// Multi-octave (fractal): big slow bends plus progressively finer crackle.
+// Multi-octave (fractal): big bends plus progressively finer, faster crackle.
 function jagOffset(s, phase, seed) {
   var o = 0, amp = jagAmp(), wl = JAG_WL, ph = phase;
   for (var k = 0; k < JAG_OCTAVES; k++) {
-    o += amp * vnoise(s/wl + ph, seed + k*19.7);
+    o += amp * vnoise(s/wl, ph, seed + k*19.7);
     amp *= 0.5; wl *= 0.5; ph *= 1.8;
   }
   return o;
