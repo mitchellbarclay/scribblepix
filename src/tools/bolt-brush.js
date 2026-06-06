@@ -121,8 +121,7 @@ function renderBolt(ctx, pts, col) {
     for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
   }
   ctx.strokeStyle = col;
-  ctx.globalAlpha = 0.14; ctx.lineWidth = w*2.8; trace(); ctx.stroke(); // outer glow halo
-  ctx.globalAlpha = 0.55; ctx.lineWidth = w*1.0; trace(); ctx.stroke(); // inner colored edge
+  ctx.globalAlpha = 0.55; ctx.lineWidth = w*1.0; trace(); ctx.stroke(); // colored edge
   ctx.globalAlpha = 1.0;  ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1, w*0.42); trace(); ctx.stroke(); // hot core
   ctx.restore();
 }
