@@ -73,10 +73,31 @@ export function initToolbar() {
     });
   });
 
-  document.getElementById('save-btn').addEventListener('click', function() {
-    var a = document.createElement('a');
-    a.download = 'drawing.png';
-    a.href = state.canvas.toDataURL();
-    a.click();
-  });
+  var saveBtn = document.getElementById('save-btn');
+  var saveHoldTimer = null;
+  var SAVE_HOLD_MS = 600;
+
+  function startSaveHold(e) {
+    e.preventDefault();
+    clearTimeout(saveHoldTimer);
+    saveBtn.classList.add('holding');
+    saveHoldTimer = setTimeout(function() {
+      saveBtn.classList.remove('holding');
+      var a = document.createElement('a');
+      a.download = 'drawing.png';
+      a.href = state.canvas.toDataURL();
+      a.click();
+    }, SAVE_HOLD_MS);
+  }
+
+  function cancelSaveHold() {
+    clearTimeout(saveHoldTimer);
+    saveBtn.classList.remove('holding');
+  }
+
+  saveBtn.addEventListener('pointerdown', startSaveHold);
+  saveBtn.addEventListener('pointerup', cancelSaveHold);
+  saveBtn.addEventListener('pointercancel', cancelSaveHold);
+  saveBtn.addEventListener('pointerleave', cancelSaveHold);
+  saveBtn.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 }

@@ -49,7 +49,7 @@ body { background: linear-gradient(135deg, var(--bg-c1) 0%, var(--bg-c2) 50%, va
 #mirror-toggle:active { transform: scale(0.92); }
 #mirror-toggle.active:active { transform: scale(1.02); }
 .mir { font-family: 'Material Symbols Outlined'; font-size: 22px; font-weight: normal; font-style: normal; line-height: 1; display: inline-block; text-transform: none; letter-spacing: normal; white-space: nowrap; word-wrap: normal; direction: ltr; -webkit-font-smoothing: antialiased; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
-#color-track { width: calc(100% - 14px); flex: 1 1 55%; min-height: 0; position: relative; border-radius: 26px; background: linear-gradient(to bottom, #ffffff 0%, #ff5fa2 10%, #c43dff 22%, #6f5fff 34%, #3fa6ff 47%, #3fff8a 60%, #ffe53f 73%, #ff7f3f 83%, #ff3f3f 92%, #2a1018 100%); box-shadow: inset 0 1px 3px rgba(0,0,0,0.10); }
+#color-track { width: calc(100% - 14px); flex: 1 1 55%; min-height: 0; position: relative; border-radius: 26px; background: linear-gradient(to bottom, #ffffff 0%, #ff5fa2 10%, #c43dff 22%, #6f5fff 34%, #3fa6ff 47%, #3fff8a 60%, #ffe53f 73%, #ff7f3f 83%, #ff3f3f 92%, #2a1018 100%); box-shadow: inset 0 2px 8px rgba(0,0,0,0.22); }
 #color-handle { position: absolute; left: 5px; right: 5px; height: 48px; background: #ecf0f1; border-radius: 12px; cursor: grab; box-shadow: 0 2px 10px rgba(0,0,0,0.32), inset 0 0 0 2px rgba(255,255,255,0.55); user-select: none; touch-action: none; transition: box-shadow 0.14s; display: flex; align-items: center; justify-content: center; }
 #color-handle:hover { box-shadow: 0 0 0 2px rgba(255,255,255,0.35), 0 3px 10px rgba(0,0,0,0.40), inset 0 0 0 2px rgba(255,255,255,0.55); }
 #color-handle.grabbing { cursor: grabbing; box-shadow: 0 0 0 3px var(--accent), 0 2px 10px rgba(0,0,0,0.32), inset 0 0 0 2px rgba(255,255,255,0.55); }
@@ -62,9 +62,10 @@ body { background: linear-gradient(135deg, var(--bg-c1) 0%, var(--bg-c2) 50%, va
 #dock-toggle:active { transform: scale(0.86); }
 #dock-toggle .mir { font-size: 22px; transition: transform 0.32s cubic-bezier(0.34,1.56,0.64,1); display: inline-block; }
 .drag-item-icon.emoji-icon { font-size: 42px; line-height: 1; width: 62px; height: 62px; display: flex; align-items: center; justify-content: center; }
-#save-btn { margin-top: auto; background: #4ec18c; border: 4px solid #ffffff; border-radius: 50%; width: 50px; height: 50px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s, background 0.12s; user-select: none; flex-shrink: 0; color: white; font-family: 'Fredoka', sans-serif; box-shadow: 0 3px 8px rgba(0,0,0,0.18); }
+#save-btn { margin-top: auto; background: #4ec18c; border: 4px solid rgba(255,255,255,0.85); border-radius: 50%; width: 50px; height: 50px; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0; user-select: none; color: white; transition: background 0.12s, transform 0.1s; box-shadow: 0 3px 8px rgba(0,0,0,0.18); }
 #save-btn:hover { background: #45b380; }
 #save-btn:active { transform: scale(0.92); }
+#save-btn.holding .settings-ring-fill { stroke-dashoffset: 0; transition: stroke-dashoffset 600ms linear; }
 .drag-item { display: flex; flex-direction: column; align-items: center; gap: 5px; cursor: grab; user-select: none; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.28)); transform-origin: center bottom; }
 .drag-item:active { cursor: grabbing; }
 @keyframes dragItemPress { 0%{transform:scale(1,1)} 45%{transform:scale(1.12,0.86)} 100%{transform:scale(0.95,0.95)} }
@@ -87,7 +88,7 @@ body { background: linear-gradient(135deg, var(--bg-c1) 0%, var(--bg-c2) 50%, va
 canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 #c { cursor: crosshair; }
 #overlay { pointer-events: none; }
-#slider-track { width: calc(100% - 14px); flex: 0 0 35%; min-height: 100px; position: relative; background: rgba(0,0,0,0.05); border-radius: 26px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.10); }
+#slider-track { width: calc(100% - 14px); flex: 0 0 35%; min-height: 100px; position: relative; background: rgba(0,0,0,0.10); border-radius: 26px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.10); }
 #slider-handle { position: absolute; left: 5px; right: 5px; height: 48px; background: #ecf0f1; border-radius: 12px; cursor: grab; display: flex; align-items: center; justify-content: center; user-select: none; touch-action: none; box-shadow: 0 2px 10px rgba(0,0,0,0.32); transition: box-shadow 0.14s; }
 #brush-preview { border-radius: 50%; background: #333; width: 12px; height: 12px; transition: width 0.12s ease-out, height 0.12s ease-out, background 0.12s; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
 #slider-handle.jumping, #color-handle.jumping { transition: top 0.18s cubic-bezier(0.34,1.4,0.64,1); }
@@ -228,7 +229,6 @@ body[data-dock="rive"] #drag-shelf { display: none !important; }
     </svg>
     <span class="mir settings-cog">settings</span>
   </button>
-  <button id="save-btn"><span class="mir" style="font-size:22px;">download</span></button>
 </div>
 
 <div id="rect-submenu">
@@ -295,6 +295,13 @@ body[data-dock="rive"] #drag-shelf { display: none !important; }
   <div id="color-track">
     <div id="color-handle"></div>
   </div>
+  <button id="save-btn" title="Hold to download">
+    <svg class="settings-ring" viewBox="0 0 64 64" aria-hidden="true">
+      <circle class="settings-ring-track" cx="32" cy="32" r="28"/>
+      <circle class="settings-ring-fill" cx="32" cy="32" r="28"/>
+    </svg>
+    <span class="mir" style="font-size:22px;">download</span>
+  </button>
 </div>
 
 <div id="action-row"></div>
