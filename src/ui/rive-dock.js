@@ -1,6 +1,6 @@
 import state from '../state.js';
 import { saveHistory, undoMagic } from '../core/history.js';
-import { hexToRgb, hslToRgb } from '../core/color-utils.js';
+import { hexToRgb, hslToRgb, lightenColor } from '../core/color-utils.js';
 import { progressiveFloodFill } from '../core/fill.js';
 import { doBoom } from '../tools/explosion.js';
 
@@ -88,6 +88,7 @@ export function initRiveDock() {
   _riveInst.on(window.rive.EventType.Advance, function() {
     if (state.color !== _lastColor) {
       _syncFillColor();
+      _syncDockColour();
       _lastColor = state.color;
     }
     _centerDock();
@@ -259,6 +260,7 @@ function _bindViewModels() {
   }
 
   _syncFillColor();
+  _syncDockColour();
   console.log('[rive-dock] ready. Tools bound:', Object.keys(_toolVMs).join(', '));
 }
 
@@ -287,6 +289,16 @@ function _syncFillColor() {
   var prop = vm.color('paintColour');
   if (!prop) return;
   prop.value = _hexToArgb(state.color || '#000000');
+}
+
+function _syncDockColour() {
+  if (!_dockVM) return;
+  var prop = _dockVM.color('dockColour');
+  if (!prop) return;
+  var rgb = hexToRgb(state.color || '#000000');
+  var tinted = lightenColor(rgb, 0.80);
+  var a = Math.round(0.9 * 255);
+  prop.value = ((a << 24) | (tinted[0] << 16) | (tinted[1] << 8) | tinted[2]) >>> 0;
 }
 
 function _hexToArgb(hex) {
