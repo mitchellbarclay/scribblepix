@@ -38,9 +38,13 @@ function ensureRenderer() {
 
   // Cheap matte lighting: ambient floor + one directional key. Flat-shaded
   // facets do the heavy lifting for the 3D read, so no specular/rim needed.
-  scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+  // A colored emissive/ambient floor keeps the body saturated (so shaded facets
+  // stay rich, not dusty-grey), while a generous directional + specular let
+  // light-facing facets brighten PAST the base colour into bright/white
+  // highlights — that overshoot is the shine that reads as 3D, not a defect.
+  scene.add(new THREE.AmbientLight(0xffffff, 0.22));
 
-  var sun = new THREE.DirectionalLight(0xffffff, 1.05);
+  var sun = new THREE.DirectionalLight(0xffffff, 0.95);
   sun.position.set(-0.45, 0.8, 0.9).normalize();
   scene.add(sun);
 }
@@ -61,22 +65,24 @@ function ensureCamera() {
   renderer.setSize(W * DPR, H * DPR);
 }
 
-function hexToColor(hex) {
-  return new THREE.Color(
-    parseInt(hex.slice(1, 3), 16) / 255,
-    parseInt(hex.slice(3, 5), 16) / 255,
-    parseInt(hex.slice(5, 7), 16) / 255
-  );
-}
-
-// Cheap matte material. flatShading derives face normals in the fragment
-// shader, so the geometry carries NO normal attribute (skips the per-rebuild
-// computeVertexNormals pass) and the facets render hard-edged / low-poly.
+// flatShading derives face normals in the fragment shader, so the geometry
+// carries NO normal attribute (skips the per-rebuild computeVertexNormals pass)
+// and the facets render hard-edged / low-poly. Passing the hex string to
+// THREE.Color does the correct sRGB→linear decode so the hue matches the
+// colour picker. A colored emissive floor keeps shaded facets vibrant (not
+// dusty), and the specular highlight gives light-facing facets a bright glint
+// that brightens past the base colour — the shine that reads as 3D.
 export function makeMaterial(color) {
-  var col = hexToColor(color);
-  return new THREE.MeshLambertMaterial({
+  var col = new THREE.Color(color);
+  // Punch up saturation a touch so the body stays candy-bright.
+  var hsl = { h: 0, s: 0, l: 0 };
+  col.getHSL(hsl);
+  col.setHSL(hsl.h, Math.min(1, hsl.s * 1.2), hsl.l);
+  return new THREE.MeshPhongMaterial({
     color: col,
-    emissive: col.clone().multiplyScalar(0.05),
+    emissive: col.clone().multiplyScalar(0.24),
+    specular: new THREE.Color(0.55, 0.55, 0.55),
+    shininess: 50,
     side: THREE.FrontSide,
     flatShading: true,
   });
