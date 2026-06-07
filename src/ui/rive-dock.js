@@ -451,9 +451,13 @@ function _doAlienBlast(dropX, dropY) {
   state.lastStrokePoints = null;
 
   var scheme   = _ALIEN_SCHEMES[Math.floor(Math.random() * _ALIEN_SCHEMES.length)];
-  function pick() { return scheme[Math.floor(Math.random() * scheme.length)]; }
   var blastHue = Math.floor(Math.random() * 360);
   var baseR    = Math.max(32, Math.min(state.canvasW, state.canvasH) * 0.09);
+
+  // N-fold symmetry: prime numbers 5/6/7 feel alien, not natural or mechanical
+  var N   = [5, 6, 7][Math.floor(Math.random() * 3)];
+  var TAU = Math.PI * 2;
+  var phi = Math.random() * TAU; // global rotation — different each blast
 
   var maxR = Math.ceil(Math.sqrt(
     Math.pow(Math.max(dropX, state.canvasW - dropX), 2) +
@@ -468,65 +472,89 @@ function _doAlienBlast(dropX, dropY) {
   offCtx.drawImage(state.canvas, 0, 0);
   _blastWarpCtx(offCtx, dropX, dropY);
 
-  // ── Pre-generate tendril paths with per-step distances ─────────────────────
+  // ── N logarithmic spiral arms  (r = r0·eᵇᶿ, all same handedness) ──────────
+  // Inner zone, scheme[0]. Grows outward as warp front sweeps past each point.
   var tendrils = [];
-  for (var tl = 0; tl < 12; tl++) {
-    var ttAngle = Math.random() * Math.PI * 2;
-    var ttLen   = baseR * (2.8 + Math.random() * 4.5);
-    var ttW     = baseR * (0.22 + Math.random() * 0.42);
-    var ttx = 0, tty = 0;
-    var ttSteps = Math.ceil(ttLen * 2.2);
+  var spiralR0  = baseR * 0.16;
+  var spiralB   = 0.19 + Math.random() * 0.05; // growth rate
+  var spiralMax = baseR * (3.2 + Math.random() * 2.0);
+  var spiralW0  = baseR * 0.17;
+
+  for (var n = 0; n < N; n++) {
+    var armBase = phi + n * (TAU / N);
     var steps = [];
-    for (var ts = 0; ts < ttSteps; ts++) {
-      var ttt = ts / ttSteps;
+    var theta = 0;
+    while (true) {
+      var r = spiralR0 * Math.exp(spiralB * theta);
+      if (r > spiralMax) break;
+      var t = r / spiralMax;
       steps.push({
-        x: dropX + ttx, y: dropY + tty,
-        r: Math.max(0.5, ttW * (1 - ttt * 0.88)),
-        a: Math.max(0, 1 - ttt * 0.65),
-        dist: Math.sqrt(ttx * ttx + tty * tty)
+        x: dropX + r * Math.cos(armBase + theta),
+        y: dropY + r * Math.sin(armBase + theta),
+        r: Math.max(0.5, spiralW0 * Math.pow(1 - t, 1.3)),
+        a: Math.max(0, 1 - t * 0.5),
+        dist: r
       });
-      ttAngle += (Math.random() - 0.5) * 0.22;
-      ttx += Math.cos(ttAngle) * (1 + Math.random() * 0.5);
-      tty += Math.sin(ttAngle) * (1 + Math.random() * 0.5);
+      theta += 0.045;
     }
-    tendrils.push({ steps: steps, color: pick(), drawn: 0 });
+    tendrils.push({ steps: steps, color: scheme[0], drawn: 0 });
   }
 
-  // ── Pre-generate blobs, satellites, streaks ────────────────────────────────
+  // ── Two concentric dot rings with uniform angular spacing ──────────────────
+  // Inner ring at spiral-arm angles (scheme[0]), outer ring offset by π/N (scheme[1]).
   var blobs = [];
-  for (var bl = 0; bl < 20; bl++) {
-    var bang = (bl / 20) * Math.PI * 2;
-    var bd   = baseR * (0.25 + Math.random() * 0.85);
+  var r1 = baseR * 1.15, br1 = baseR * 0.38;
+  var r2 = baseR * 2.2,  br2 = baseR * 0.26;
+  for (var ni = 0; ni < N; ni++) {
+    var a1 = phi + ni * (TAU / N);
     blobs.push({
-      x: dropX + Math.cos(bang) * bd, y: dropY + Math.sin(bang) * bd,
-      r: baseR * (0.42 + Math.random() * 0.88),
-      color: pick(), alpha: 0.75 + Math.random() * 0.25,
-      dist: bd, drawn: false
+      x: dropX + r1 * Math.cos(a1), y: dropY + r1 * Math.sin(a1),
+      r: br1, color: scheme[0], alpha: 0.92, dist: r1, drawn: false
+    });
+    var a2 = phi + ni * (TAU / N) + Math.PI / N; // half-step between arms
+    blobs.push({
+      x: dropX + r2 * Math.cos(a2), y: dropY + r2 * Math.sin(a2),
+      r: br2, color: scheme[1], alpha: 0.88, dist: r2, drawn: false
     });
   }
 
+  // ── N radial streaks as dot-steps (extend along with warp front) ───────────
+  // Placed at outer-ring angles so they interleave with spiral arms.
+  var streakLen  = baseR * (4.5 + Math.random() * 2.0);
+  var streaks    = []; // reuse tendril drawing loop — same {steps, color, drawn} shape
+  var streakHsl  = 'hsla(' + blastHue + ',100%,78%,1)';
+  for (var ns = 0; ns < N; ns++) {
+    var sAng = phi + ns * (TAU / N) + Math.PI / N;
+    var sSteps = [];
+    // 1px dot spacing → near-continuous line that grows with the front
+    for (var sd = 0; sd <= streakLen; sd += 1) {
+      sSteps.push({
+        x: dropX + Math.cos(sAng) * sd, y: dropY + Math.sin(sAng) * sd,
+        r: 0.9, a: 0.6, dist: sd
+      });
+    }
+    streaks.push({ steps: sSteps, color: streakHsl, drawn: 0 });
+  }
+  // Merge streaks into the tendrils list so the animation loop handles them uniformly
+  for (var ms = 0; ms < streaks.length; ms++) tendrils.push(streaks[ms]);
+
+  // ── N satellites at streak endpoints + secondary dots at ~60% ─────────────
   var satellites = [];
-  for (var sl = 0; sl < 24; sl++) {
-    var sAng2 = Math.random() * Math.PI * 2;
-    var sDist = baseR * (2.0 + Math.random() * 5.5);
+  var satR  = Math.max(5, baseR * 0.20);
+  var sat2R = Math.max(3, baseR * 0.10);
+  for (var nsat = 0; nsat < N; nsat++) {
+    var satAng = phi + nsat * (TAU / N) + Math.PI / N;
     satellites.push({
-      x: dropX + Math.cos(sAng2) * sDist, y: dropY + Math.sin(sAng2) * sDist,
-      r: Math.max(3, baseR * (0.07 + Math.random() * 0.38)),
-      color: pick(), alpha: 0.65 + Math.random() * 0.35,
-      dist: sDist, drawn: false
+      x: dropX + Math.cos(satAng) * streakLen,
+      y: dropY + Math.sin(satAng) * streakLen,
+      r: satR, color: scheme[1], alpha: 0.92,
+      dist: streakLen, drawn: false
     });
-  }
-
-  var nStreaks = 6 + Math.floor(Math.random() * 5);
-  var streaks = [];
-  for (var sr = 0; sr < nStreaks; sr++) {
-    var sAng3 = Math.random() * Math.PI * 2;
-    var sLen  = baseR * (3.2 + Math.random() * 4.8);
-    streaks.push({
-      ex: dropX + Math.cos(sAng3) * sLen, ey: dropY + Math.sin(sAng3) * sLen,
-      hue: (blastHue + sr * 42) % 360,
-      alpha: 0.55 + Math.random() * 0.35,
-      dist: sLen, drawn: false
+    var d2 = streakLen * (0.52 + Math.random() * 0.14);
+    satellites.push({
+      x: dropX + Math.cos(satAng) * d2, y: dropY + Math.sin(satAng) * d2,
+      r: sat2R, color: scheme[0], alpha: 0.82,
+      dist: d2, drawn: false
     });
   }
 
