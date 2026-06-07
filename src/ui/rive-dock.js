@@ -212,6 +212,48 @@ function _bindViewModels() {
     })(name, effectTrig);
   });
 
+  // Mirror: watch mirrorActive boolean on the nested 'mirror' VM instance
+  var mirrorInst = _dockVM.viewModel('mirror');
+  if (mirrorInst) {
+    _toolVMs.mirror = mirrorInst;
+    var mirrorBool = mirrorInst.boolean('mirrorActive');
+    if (mirrorBool && typeof mirrorBool.on === 'function') {
+      mirrorBool.on(function() {
+        state.mirrorMode = mirrorBool.value;
+        var btn = document.getElementById('mirror-toggle');
+        if (btn) btn.classList.toggle('active', state.mirrorMode);
+      });
+    } else {
+      console.warn('[rive-dock] mirrorActive boolean not found or not subscribable');
+    }
+  } else {
+    console.warn('[rive-dock] missing VM instance for: mirror');
+  }
+
+  // Alien: watch blast trigger on the nested 'alien' VM instance
+  var alienInst = _dockVM.viewModel('alien');
+  if (alienInst) {
+    _toolVMs.alien = alienInst;
+    var blastTrig = alienInst.trigger('blast');
+    if (blastTrig && typeof blastTrig.on === 'function') {
+      blastTrig.on(function() {
+        var dropX = 0, dropY = 0;
+        if (_dockVM) {
+          var pxProp = _dockVM.number('dropX');
+          var pyProp = _dockVM.number('dropY');
+          if (pxProp) dropX = pxProp.value;
+          if (pyProp) dropY = pyProp.value;
+        }
+        console.log('[rive-dock] alien blast at', Math.round(dropX), Math.round(dropY));
+        _fireEffect('alien', dropX, dropY);
+      });
+    } else {
+      console.warn('[rive-dock] blast trigger not found or not subscribable on alien VM');
+    }
+  } else {
+    console.warn('[rive-dock] missing VM instance for: alien');
+  }
+
   _syncFillColor();
   console.log('[rive-dock] ready. Tools bound:', Object.keys(_toolVMs).join(', '));
 }
@@ -290,6 +332,8 @@ function _fireEffect(toolName, dropX, dropY) {
     doBoom(dropX, dropY);
   } else if (toolName === 'tornado') {
     _doTornadoWipe();
+  } else if (toolName === 'alien') {
+    _doAlienBlast(dropX, dropY);
   }
 }
 
@@ -375,4 +419,227 @@ function _fireTrigger(vmInst, triggerName) {
   if (!t) return;
   if (typeof t.fire === 'function') t.fire();
   else if (typeof t.trigger === 'function') t.trigger();
+}
+
+// ── Alien blast: concentrated paint explosion + displacement wave ──────────────
+// Rive handles the UFO animation; this fires the canvas-side impact effect.
+
+var _ALIEN_SCHEMES = [
+  ['#ff4daa', '#c44dff'],
+  ['#4dffb4', '#4db8ff'],
+  ['#ffe04d', '#ff8c4d'],
+  ['#4dff91', '#00d4ff'],
+  ['#ff4d6e', '#ff9b4d'],
+];
+
+function _doAlienBlast(dropX, dropY) {
+  saveHistory();
+  state.lastStrokePoints = null;
+
+  var scheme = _ALIEN_SCHEMES[Math.floor(Math.random() * _ALIEN_SCHEMES.length)];
+  function pick() { return scheme[Math.floor(Math.random() * scheme.length)]; }
+  var blastHue = Math.floor(Math.random() * 360);
+
+  var maxR = Math.ceil(Math.sqrt(
+    Math.pow(Math.max(dropX, state.canvasW - dropX), 2) +
+    Math.pow(Math.max(dropY, state.canvasH - dropY), 2)
+  )) + 10;
+
+  // Epicentre flash burned in immediately — snapshot includes it so wave carries it outward
+  var cg = state.ctx.createRadialGradient(dropX, dropY, 0, dropX, dropY, 22);
+  cg.addColorStop(0, 'rgba(255,255,255,0.95)');
+  cg.addColorStop(0.4, 'hsla(' + blastHue + ',100%,72%,0.75)');
+  cg.addColorStop(1, 'hsla(' + blastHue + ',100%,72%,0)');
+  state.ctx.fillStyle = cg;
+  state.ctx.beginPath(); state.ctx.arc(dropX, dropY, 22, 0, Math.PI * 2); state.ctx.fill();
+
+  // Snapshot after the epicentre flash so the wave displaces it outward
+  var snapCanvas = document.createElement('canvas');
+  snapCanvas.width = state.canvas.width;
+  snapCanvas.height = state.canvas.height;
+  snapCanvas.getContext('2d').drawImage(state.canvas, 0, 0);
+  var snapData = snapCanvas.getContext('2d').getImageData(0, 0, snapCanvas.width, snapCanvas.height);
+
+  var pulseR = 0;
+  var flashAlpha = 1.0;
+  var paintStamped = false;
+  var PULSE_SPEED = 580;
+
+  var lastT = performance.now();
+  function blastFrame() {
+    var now = performance.now();
+    var dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+
+    flashAlpha = Math.max(0, flashAlpha - dt * 3.2);
+    pulseR += dt * PULSE_SPEED;
+
+    // Wave displacement from pre-blast snapshot
+    if (snapData && pulseR < maxR) {
+      _applyBlastWave(snapData, dropX, dropY, pulseR);
+    } else if (pulseR >= maxR) {
+      snapData = null;
+    }
+
+    state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
+
+    // Overlay flash glow
+    if (flashAlpha > 0) {
+      var fg = state.ovCtx.createRadialGradient(dropX, dropY, 0, dropX, dropY, 65);
+      fg.addColorStop(0, 'rgba(255,255,255,' + flashAlpha.toFixed(3) + ')');
+      fg.addColorStop(0.45, 'hsla(' + blastHue + ',100%,72%,' + (flashAlpha * 0.55).toFixed(3) + ')');
+      fg.addColorStop(1, 'rgba(0,0,0,0)');
+      state.ovCtx.fillStyle = fg;
+      state.ovCtx.beginPath(); state.ovCtx.arc(dropX, dropY, 65, 0, Math.PI * 2); state.ovCtx.fill();
+    }
+
+    // Expanding shockwave ring on overlay
+    if (pulseR < maxR + 30) {
+      var ringFade = Math.max(0, 1 - pulseR / maxR);
+      state.ovCtx.save();
+      state.ovCtx.globalAlpha = ringFade * 0.45;
+      state.ovCtx.strokeStyle = 'hsla(' + blastHue + ',100%,72%,1)';
+      state.ovCtx.lineWidth = 18;
+      state.ovCtx.beginPath(); state.ovCtx.arc(dropX, dropY, pulseR, 0, Math.PI * 2); state.ovCtx.stroke();
+      state.ovCtx.restore();
+      state.ovCtx.save();
+      state.ovCtx.globalAlpha = ringFade * 0.9;
+      state.ovCtx.strokeStyle = 'white';
+      state.ovCtx.lineWidth = 2;
+      state.ovCtx.beginPath(); state.ovCtx.arc(dropX, dropY, pulseR, 0, Math.PI * 2); state.ovCtx.stroke();
+      state.ovCtx.restore();
+    }
+
+    // Stamp paint explosion at epicentre once the flash dims
+    if (!paintStamped && flashAlpha < 0.35) {
+      paintStamped = true;
+      var baseR = Math.max(12, Math.min(48, state.brushSize * 0.65 + 8));
+      state.ctx.save();
+      // Core blobs
+      for (var i = 0; i < 10; i++) {
+        var ang = (i / 10) * Math.PI * 2;
+        var blobD = Math.random() * baseR * 0.45;
+        var blobR = baseR * (0.55 + Math.random() * 0.6);
+        state.ctx.fillStyle = pick();
+        state.ctx.beginPath();
+        state.ctx.arc(dropX + Math.cos(ang) * blobD, dropY + Math.sin(ang) * blobD, blobR, 0, Math.PI * 2);
+        state.ctx.fill();
+      }
+      // Tendrils
+      for (var l = 0; l < 5; l++) {
+        var ta = Math.random() * Math.PI * 2;
+        var tlen = baseR * (1.4 + Math.random() * 2.2);
+        var tw = baseR * (0.28 + Math.random() * 0.35);
+        var tx = dropX, ty = dropY;
+        var tsteps = Math.ceil(tlen);
+        state.ctx.fillStyle = pick();
+        for (var s = 0; s < tsteps; s++) {
+          var tt = s / tsteps;
+          var tr = Math.max(1, tw * (1 - tt * 0.8));
+          state.ctx.beginPath();
+          state.ctx.arc(tx, ty, tr, 0, Math.PI * 2);
+          state.ctx.fill();
+          ta += (Math.random() - 0.5) * 0.14;
+          tx += Math.cos(ta); ty += Math.sin(ta);
+        }
+      }
+      // Satellite splatters
+      for (var k = 0; k < 7; k++) {
+        var sa = Math.random() * Math.PI * 2;
+        var sataD = baseR * (1.4 + Math.random() * 2.8);
+        var satR = Math.max(2, baseR * (0.1 + Math.random() * 0.28));
+        state.ctx.fillStyle = pick();
+        state.ctx.beginPath();
+        state.ctx.arc(dropX + Math.cos(sa) * sataD, dropY + Math.sin(sa) * sataD, satR, 0, Math.PI * 2);
+        state.ctx.fill();
+      }
+      state.ctx.restore();
+    }
+
+    if (pulseR < maxR || flashAlpha > 0) {
+      requestAnimationFrame(blastFrame);
+    } else {
+      snapData = null;
+      state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
+    }
+  }
+  requestAnimationFrame(blastFrame);
+}
+
+// Per-frame radial wave displacement — reads only from snapData, never stalls on GPU readback.
+function _applyBlastWave(snapData, blastX, blastY, waveR) {
+  var DPR = state.DPR;
+  var WAVE_W = 45, WAVE_DECAY = 65, WAVE_MAX = 38, PUSH_R = 240;
+
+  var waveRp  = waveR   * DPR;
+  var waveWp  = WAVE_W  * DPR;
+  var decayDp = WAVE_DECAY * DPR;
+  var maxPushP = WAVE_MAX * DPR;
+  var pushRp  = PUSH_R  * DPR;
+
+  var settleRp = Math.round(4 * decayDp);
+  var innerRp  = Math.max(0, waveRp - settleRp);
+  var outerRp  = Math.min(pushRp, waveRp + waveWp);
+  if (innerRp >= outerRp) return;
+
+  var bcx = blastX * DPR, bcy = blastY * DPR;
+  var snapW = snapData.width;
+  var sd = snapData.data;
+
+  var bx0 = Math.max(0, Math.floor(bcx - outerRp - 2));
+  var by0 = Math.max(0, Math.floor(bcy - outerRp - 2));
+  var bx1 = Math.min(state.canvas.width,  Math.ceil(bcx + outerRp + 2));
+  var by1 = Math.min(state.canvas.height, Math.ceil(bcy + outerRp + 2));
+  var pw = bx1 - bx0, ph = by1 - by0;
+  if (pw <= 0 || ph <= 0) return;
+
+  var lutSize = Math.ceil(outerRp) + 2;
+  var lut = new Float32Array(lutSize);
+  for (var li = 0; li < lutSize; li++) {
+    if (li <= innerRp) { lut[li] = 0; continue; }
+    var lag = waveRp - li;
+    if (lag < -waveWp || li > pushRp) { lut[li] = 0; continue; }
+    if (lag < 0) {
+      var te = (lag + waveWp) / waveWp;
+      lut[li] = te * te * maxPushP;
+    } else {
+      lut[li] = maxPushP * Math.exp(-lag / decayDp);
+    }
+  }
+
+  var dst = new ImageData(pw, ph);
+  var dd  = dst.data;
+  var outerRp2 = outerRp * outerRp;
+
+  for (var py = 0; py < ph; py++) {
+    var wy  = py + by0;
+    var dy0 = wy - bcy;
+    var dy2 = dy0 * dy0;
+    for (var px = 0; px < pw; px++) {
+      var wx  = px + bx0;
+      var dx0 = wx - bcx;
+      var di  = (py * pw + px) * 4;
+      var dist2 = dx0 * dx0 + dy2;
+
+      if (dist2 > outerRp2) {
+        var os = (wy * snapW + wx) * 4;
+        dd[di] = sd[os]; dd[di+1] = sd[os+1]; dd[di+2] = sd[os+2]; dd[di+3] = sd[os+3];
+        continue;
+      }
+
+      var dist = Math.sqrt(dist2);
+      var dIdx = Math.min(Math.round(dist), lutSize - 1);
+      var strength = lut[dIdx];
+      var srcX, srcY;
+      if (strength < 0.5 || dist < 1) {
+        srcX = wx; srcY = wy;
+      } else {
+        srcX = Math.min(Math.max(0, Math.round(wx - (dx0 / dist) * strength)), snapW - 1);
+        srcY = Math.min(Math.max(0, Math.round(wy - (dy0 / dist) * strength)), snapData.height - 1);
+      }
+      var si = (srcY * snapW + srcX) * 4;
+      dd[di] = sd[si]; dd[di+1] = sd[si+1]; dd[di+2] = sd[si+2]; dd[di+3] = sd[si+3];
+    }
+  }
+  state.ctx.putImageData(dst, bx0, by0);
 }
