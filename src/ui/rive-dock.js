@@ -603,7 +603,10 @@ function _doAlienBlast(dropX, dropY) {
         state.ctx.arc(dropX, dropY, Math.max(0, lastRevealR - 1), 0, Math.PI * 2, true);
       }
       state.ctx.clip();
-      state.ctx.drawImage(offscreen, 0, 0);
+      // Draw at CSS size (state.canvasW × state.canvasH) so the physical-pixel
+      // offscreen maps 1:1 to the canvas — ctx has scale(2,2) applied, so
+      // drawImage(offscreen, 0, 0) would otherwise render it at 2× the canvas area.
+      state.ctx.drawImage(offscreen, 0, 0, state.canvasW, state.canvasH);
       state.ctx.restore();
     }
 
