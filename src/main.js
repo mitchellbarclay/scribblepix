@@ -19,6 +19,7 @@ import { initDragTools } from './ui/drag-tools.js';
 import { initDock } from './ui/dock.js';
 import { initRiveDock, setRiveDockActive, riveDockStrokeHit } from './ui/rive-dock.js';
 import { initSettingsMenu } from './ui/settings-menu.js';
+import { initRailSync } from './ui/rail-sync.js';
 import { warmupTools } from './tools/prewarm.js';
 
 // Init DOM refs into state
@@ -147,6 +148,7 @@ initToolbarOverflow();
 initDragTools();
 initDock();
 initSettingsMenu();
+initRailSync();
 initRiveDock();
 
 var _dockModeToggle = document.getElementById('debug-dock-toggle');
