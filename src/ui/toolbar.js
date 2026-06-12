@@ -83,16 +83,38 @@ export function initToolbar() {
     saveBtn.classList.add('holding');
     saveHoldTimer = setTimeout(function() {
       saveBtn.classList.remove('holding');
-      var a = document.createElement('a');
-      a.download = 'drawing.png';
-      a.href = state.canvas.toDataURL();
-      a.click();
+      saveDrawing();
     }, SAVE_HOLD_MS);
   }
 
   function cancelSaveHold() {
     clearTimeout(saveHoldTimer);
     saveBtn.classList.remove('holding');
+  }
+
+  // On touch devices, hand the PNG to the native share sheet so "Save Image"
+  // puts it straight in the photo library (a web app can't write there
+  // directly, and a download link makes iPad Safari offer "Open in Preview").
+  // Everything here stays synchronous: WebKit only carries the user-gesture
+  // token through the hold timer into this tick, and navigator.share refuses
+  // to open without it. Desktop (fine pointer) keeps the plain download.
+  function saveDrawing() {
+    var dataUrl = state.canvas.toDataURL('image/png');
+    var wantShare = navigator.share && window.matchMedia('(pointer: coarse)').matches;
+    if (wantShare) {
+      var bin = atob(dataUrl.split(',')[1]);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var file = new File([bytes], 'scribblepix.png', { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file] }).catch(function() {}); // user closing the sheet rejects — fine
+        return;
+      }
+    }
+    var a = document.createElement('a');
+    a.download = 'scribblepix.png';
+    a.href = dataUrl;
+    a.click();
   }
 
   saveBtn.addEventListener('pointerdown', startSaveHold);

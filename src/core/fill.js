@@ -1,5 +1,6 @@
 import state from '../state.js';
 import { hexToRgb, hslToRgb } from './color-utils.js';
+import { fillScan } from './fill-scan.js';
 
 var POUR_VX0 = -1.5, POUR_FRICTION = 0.93, POUR_GRAVITY = 0.34;
 var POUR_SPAWN_DX = -15, POUR_SPAWN_DY = 0;
@@ -42,69 +43,105 @@ export function doFill(sx, sy) {
   state.ctx.putImageData(img, 0, 0);
 }
 
-export function progressiveFloodFill(sx, sy, rgb, onDone) {
-  flattenCanvas();
+// ── Progressive flood fill ────────────────────────────────────────────────────
+// The heavy work (flatten + BFS over every physical pixel) runs in a module
+// worker so the drop moment doesn't freeze the main thread — on iPad a large
+// fill cost several hundred ms synchronously. The reveal animation then paints
+// the pre-computed result through an expanding ring clip + drawImage (same
+// pattern as the alien-blast warp reveal): one GPU composite per frame instead
+// of scanning every fill pixel and putImageData-ing a growing rect.
+
+var _fillWorker;
+function _getFillWorker() {
+  if (_fillWorker === undefined) {
+    try {
+      _fillWorker = new Worker(new URL('./fill-worker.js', import.meta.url), { type: 'module' });
+    } catch (e) {
+      console.warn('[fill] worker unavailable, falling back to sync fill:', e);
+      _fillWorker = null;
+    }
+  }
+  return _fillWorker;
+}
+
+export function progressiveFloodFill(sx, sy, rgb, onDone, baseImg) {
   var w = state.canvas.width, h = state.canvas.height;
   if (sx < 0 || sx >= w || sy < 0 || sy >= h) { onDone(); return; }
-  var img = state.ctx.getImageData(0, 0, w, h), data = img.data;
-  var p0 = sy*w + sx;
-  var idx0 = p0*4, tr = data[idx0], tg = data[idx0+1], tb = data[idx0+2], ta = data[idx0+3];
-  var tol = state.fillTolerance;
-  var fr = rgb[0], fg = rgb[1], fb = rgb[2];
-
-  var vis = new Uint8Array(w*h);
-  var queue = new Int32Array(w*h);
-  var qHead = 0, qTail = 0;
-  queue[qTail++] = p0; vis[p0] = 1;
-  var targets = new Int32Array(w*h), tCount = 0;
-  while (qHead < qTail) {
-    var p = queue[qHead++];
-    var i = p*4;
-    if (Math.abs(data[i]-tr)>tol || Math.abs(data[i+1]-tg)>tol || Math.abs(data[i+2]-tb)>tol || Math.abs(data[i+3]-ta)>tol) continue;
-    targets[tCount++] = p;
-    var px = p%w, py = (p-px)/w;
-    if (px+1 < w)  { var n = p+1; if (!vis[n]) { vis[n]=1; queue[qTail++]=n; } }
-    if (px > 0)    { var n = p-1; if (!vis[n]) { vis[n]=1; queue[qTail++]=n; } }
-    if (py+1 < h)  { var n = p+w; if (!vis[n]) { vis[n]=1; queue[qTail++]=n; } }
-    if (py > 0)    { var n = p-w; if (!vis[n]) { vis[n]=1; queue[qTail++]=n; } }
+  // A caller that just took an undo snapshot can pass it in — copying it is a
+  // memcpy, much cheaper than a second synchronous GPU readback.
+  var img;
+  if (baseImg && baseImg.width === w && baseImg.height === h) {
+    img = new ImageData(new Uint8ClampedArray(baseImg.data), w, h);
+  } else {
+    img = state.ctx.getImageData(0, 0, w, h);
   }
-  if (!tCount) { onDone(); return; }
 
-  var cx = sx, cy = Math.min(h-1, sy+30);
-  var maxDistSq = 0;
-  for (var k = 0; k < tCount; k++) {
-    var pp = targets[k], ppx = pp%w, ppy = (pp-ppx)/w;
-    var ddx = ppx-cx, ddy = ppy-cy;
-    var dsq = ddx*ddx+ddy*ddy;
-    if (dsq > maxDistSq) maxDistSq = dsq;
+  var worker = _getFillWorker();
+  if (worker) {
+    worker.onmessage = function(e) {
+      _revealFill(e.data, sx, sy, onDone);
+    };
+    worker.onerror = function(err) {
+      console.error('[fill] worker failed, using sync fill from now on:', err.message || err);
+      _fillWorker = null;
+      // The transferred buffer is gone — rescan from a fresh readback.
+      var fresh = state.ctx.getImageData(0, 0, w, h);
+      var res = fillScan(fresh.data, w, h, sx, sy, state.fillTolerance, rgb, state.BG);
+      res.buffer = fresh.data.buffer;
+      _revealFill(res, sx, sy, onDone);
+    };
+    worker.postMessage(
+      { buffer: img.data.buffer, w: w, h: h, sx: sx, sy: sy, tol: state.fillTolerance, fill: rgb, bg: state.BG },
+      [img.data.buffer]
+    );
+  } else {
+    var res = fillScan(img.data, w, h, sx, sy, state.fillTolerance, rgb, state.BG);
+    res.buffer = img.data.buffer;
+    _revealFill(res, sx, sy, onDone);
   }
-  var maxDist = Math.sqrt(maxDistSq);
+}
+
+// Paints the scan result onto the canvas as an expanding circular reveal.
+// res.buffer holds the full flattened+filled canvas; pixels outside the fill
+// region are identical to what's already on screen, so over-painting them
+// inside the ring is invisible and lets us use one clipped drawImage per frame.
+function _revealFill(res, sx, sy, onDone) {
+  if (!res.count) { onDone(); return; }
+  var w = state.canvas.width, h = state.canvas.height;
+  var DPR = state.DPR;
+  var bw = res.maxX - res.minX + 1, bh = res.maxY - res.minY + 1;
+
+  var off = document.createElement('canvas');
+  off.width = bw; off.height = bh;
+  var img = new ImageData(new Uint8ClampedArray(res.buffer), w, h);
+  off.getContext('2d').putImageData(img, -res.minX, -res.minY, res.minX, res.minY, bw, bh);
+
+  // Same reveal origin formula as fillScan — maxDist is measured from here.
+  var cx = sx / DPR, cy = Math.min(h-1, sy+30) / DPR;
+  var maxDist = res.maxDist / DPR;
+  var dxCSS = res.minX / DPR, dyCSS = res.minY / DPR, dwCSS = bw / DPR, dhCSS = bh / DPR;
   var startTime = performance.now(), duration = 1000;
-  var committed = new Uint8Array(tCount);
+  var lastR = 0;
 
   function frame() {
-    var elapsed = performance.now() - startTime;
-    var t = Math.min(1, elapsed/duration);
+    var t = Math.min(1, (performance.now() - startTime) / duration);
     var eased = 1 - Math.pow(1-t, 2);
     var radius = maxDist * eased;
-    var radiusSq = radius*radius;
-    var done = t >= 1;
-    var dxMin = w, dxMax = -1, dyMin = h, dyMax = -1;
-    for (var k = 0; k < tCount; k++) {
-      if (committed[k]) continue;
-      var pp = targets[k], ppx = pp%w, ppy = (pp-ppx)/w;
-      var ddx = ppx-cx, ddy = ppy-cy;
-      if (!done && ddx*ddx+ddy*ddy > radiusSq) continue;
-      committed[k] = 1;
-      var ii = pp*4;
-      data[ii] = fr; data[ii+1] = fg; data[ii+2] = fb; data[ii+3] = 255;
-      if (ppx < dxMin) dxMin = ppx; if (ppx > dxMax) dxMax = ppx;
-      if (ppy < dyMin) dyMin = ppy; if (ppy > dyMax) dyMax = ppy;
+    if (radius > lastR || t >= 1) {
+      state.ctx.save();
+      state.ctx.beginPath();
+      state.ctx.arc(cx, cy, radius + 1, 0, Math.PI*2, false);
+      if (lastR > 0.5) {
+        // Cut out the already-revealed inner zone with a reverse arc; the 2px
+        // overlap re-covers the previous frame's anti-aliased clip edge.
+        state.ctx.arc(cx, cy, Math.max(0, lastR - 1), 0, Math.PI*2, true);
+      }
+      state.ctx.clip();
+      state.ctx.drawImage(off, dxCSS, dyCSS, dwCSS, dhCSS);
+      state.ctx.restore();
+      lastR = radius;
     }
-    if (dxMax >= dxMin) {
-      state.ctx.putImageData(img, 0, 0, dxMin, dyMin, dxMax-dxMin+1, dyMax-dyMin+1);
-    }
-    if (!done) requestAnimationFrame(frame);
+    if (t < 1) requestAnimationFrame(frame);
     else onDone();
   }
   frame();

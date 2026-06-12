@@ -445,9 +445,11 @@ function _doFill(dropX, dropY) {
   var rgb = fc.indexOf('hsl') === 0 ? hslToRgb(fc) : hexToRgb(fc);
   var sx = Math.round(dropX * state.DPR);
   var sy = Math.round(dropY * state.DPR);
+  // Pass the snapshot saveHistory just took so the fill copies it instead of
+  // doing a second synchronous GPU readback of the whole canvas.
   progressiveFloodFill(sx, sy, rgb, function() {
     _fillBusy = false;
-  });
+  }, state.undoSnapshot);
 }
 
 // ── Undo: delegates to undoMagic from history.js ─────────────────────────────
