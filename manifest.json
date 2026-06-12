@@ -2,7 +2,7 @@
   "name": "Scribblepix",
   "short_name": "Scribblepix",
   "display": "standalone",
-  "start_url": "/drawing-app.html",
+  "start_url": "/scribblepix/drawing-app.html",
   "icons": [
     { "src": "app-icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "app-icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
