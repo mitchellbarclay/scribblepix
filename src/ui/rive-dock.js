@@ -145,6 +145,40 @@ export function initRiveDock() {
       state.canvas.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
     }
   });
+
+  // ── touchend → mouseup shim ────────────────────────────────────────────────
+  // The Rive web runtime's touchend handler fires pointerUp + pointerExit
+  // before the same advance; the exit clears any hover ("over dock") state the
+  // .riv state machine relies on, so releasing a dragged tool inside the dock
+  // behaved like dropping it on the canvas. mouseup fires pointerUp only.
+  // Intercept touchend in the capture phase (runs before Rive's bubble
+  // listener) and replay it as a mouseup so touch matches mouse semantics.
+  // Native pointerup has already fired by touchend time, so the relay above
+  // is unaffected.
+  var _touchId = null;
+  canvas.addEventListener('touchstart', function(e) {
+    if (_touchId === null && e.changedTouches.length) _touchId = e.changedTouches[0].identifier;
+  }, true);
+  canvas.addEventListener('touchend', function(e) {
+    var t = null;
+    for (var i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === _touchId) { t = e.changedTouches[i]; break; }
+    }
+    if (!t) return;
+    _touchId = null;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: t.clientX, clientY: t.clientY }));
+    // Rive resets its single-touch primary-finger lock in its touchend handler
+    // (now suppressed) and in touchcancel — fire the latter so the next touch
+    // can claim the lock. Its touchcancel callback ignores the event payload.
+    canvas.dispatchEvent(new Event('touchcancel'));
+    // stopImmediatePropagation also keeps the touchend from window's slider/
+    // colour release handlers — replay it so a drag that wanders onto the
+    // dock canvas still releases cleanly.
+    window.dispatchEvent(new Event('touchend'));
+  }, true);
+  canvas.addEventListener('touchcancel', function() { _touchId = null; }, true);
 }
 
 export function setRiveDockActive(active) {

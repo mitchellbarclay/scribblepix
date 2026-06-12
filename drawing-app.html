@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Scribblepix</title>
 <link rel="icon" type="image/svg+xml" href="app-icons/favicon.svg">
 <link rel="icon" type="image/png" sizes="64x64" href="app-icons/favicon-64x64.png">
@@ -13,13 +13,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&family=Fredoka:wght@400;500;600;700&family=Coiny&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-tap-highlight-color: transparent; }
 @property --bg-c1 { syntax: '<color>'; initial-value: #1a1a2e; inherits: true; }
 @property --bg-c2 { syntax: '<color>'; initial-value: #1a1a2e; inherits: true; }
 @property --bg-c3 { syntax: '<color>'; initial-value: #1a1a2e; inherits: true; }
 @property --rail-bg { syntax: '<color>'; initial-value: rgba(150,190,195,0.55); inherits: true; }
 @property --accent { syntax: '<color>'; initial-value: #6cb8b6; inherits: true; }
 @property --accent-dark { syntax: '<color>'; initial-value: #2d6a68; inherits: true; }
-body { background: linear-gradient(135deg, var(--bg-c1) 0%, var(--bg-c2) 50%, var(--bg-c3) 100%); font-family: 'Fredoka', sans-serif; overflow: hidden; height: 100vh; display: flex; flex-direction: row; transition: --bg-c1 0.15s linear, --bg-c2 0.15s linear, --bg-c3 0.15s linear, --rail-bg 0.15s linear, --accent 0.15s linear; }
+body { background: linear-gradient(135deg, var(--bg-c1) 0%, var(--bg-c2) 50%, var(--bg-c3) 100%); font-family: 'Fredoka', sans-serif; overflow: hidden; height: 100vh; height: 100dvh; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; display: flex; flex-direction: row; transition: --bg-c1 0.15s linear, --bg-c2 0.15s linear, --bg-c3 0.15s linear, --rail-bg 0.15s linear, --accent 0.15s linear; }
 #left-rail, #right-rail { width: 84px; flex-shrink: 0; background: var(--rail-bg); display: flex; flex-direction: column; align-items: center; padding: 18px 0; gap: 16px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 #tool-pill { background: transparent; display: flex; flex-direction: column; gap: 8px; align-items: center; flex: 1 1 0; min-height: 0; width: 100%; }
 #tool-scroll-section { position: relative; min-height: 0; width: calc(100% - 14px); display: flex; flex-direction: column; align-items: center; background: rgba(0,0,0,0.05); border-radius: 26px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.10); overflow: hidden; }
