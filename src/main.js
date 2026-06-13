@@ -150,3 +150,24 @@ if (window.requestIdleCallback) {
 } else {
   setTimeout(warmupTools, 50);
 }
+
+// ── Update check ──────────────────────────────────────────────────────────────
+// GitHub Pages caches everything for 10 minutes and the installed home-screen
+// app has no refresh UI, so a fresh deploy can be invisible on iPad. At startup
+// (canvas is blank, so a reload can never lose a drawing) compare version.json
+// (fetched uncached; bumped on every push) with the last version this device
+// saw and reload once if it changed. The sessionStorage guard stops a reload
+// loop while the CDN is still serving stale files.
+fetch('version.json', { cache: 'no-store' })
+  .then(function(r) { return r.json(); })
+  .then(function(j) {
+    var seen = localStorage.getItem('scribblepix-version');
+    if (seen !== j.v) {
+      localStorage.setItem('scribblepix-version', j.v);
+      if (seen !== null && sessionStorage.getItem('scribblepix-reloaded') !== j.v) {
+        sessionStorage.setItem('scribblepix-reloaded', j.v);
+        location.reload();
+      }
+    }
+  })
+  .catch(function() {}); // offline / file:// — skip silently
