@@ -14,6 +14,8 @@ var _bound = false;
 var _riveCapturing = false; // true while a dock tool drag is in progress
 var _strokeFaded = false;  // dock faded out because the current stroke crossed it
 var _mirrorBool = null;   // polled each Advance frame to sync mirror state
+var _releaseReadyBool = null; // DockVM.releaseReady — gates whether a release leads to an action
+var _pendingReleases = []; // safety-timeout ids, one per release that promised an action trigger
 
 export function initRiveDock() {
   if (!window.rive) { console.warn('[rive-dock] Rive runtime not loaded'); return; }
@@ -131,6 +133,22 @@ export function initRiveDock() {
     }
   });
 
+  // Stuck-drag safety: if a dock tool is being dragged and the pointer leaves
+  // the rive canvas before releasing (mouse heading into a rail or out the
+  // window), Rive never sees the pointer-up and the tool stays glued to a
+  // pointer it can no longer track. Fire the dragging tool's release trigger
+  // from JS so the state machine resolves it (bounce back or action, per
+  // releaseReady) instead of getting stuck.
+  canvas.addEventListener('pointerleave', function() {
+    if (!_riveCapturing) return;
+    _riveCapturing = false;
+    Object.keys(_toolVMs).forEach(function(name) {
+      var vm = _toolVMs[name];
+      var dragging = vm.boolean && vm.boolean('dragging');
+      if (dragging && dragging.value) _fireTrigger(vm, 'release');
+    });
+  });
+
   canvas.addEventListener('pointerup', function(e) {
     if (!_active) return;
     var wasCap = _riveCapturing;
@@ -224,12 +242,16 @@ function _bindViewModels() {
 
   _pushCanvasSize();
 
+  _releaseReadyBool = _dockVM.boolean('releaseReady');
+  if (!_releaseReadyBool) console.warn('[rive-dock] releaseReady boolean not found — release lockout disabled');
+
   var effectTriggerNames = { tornado: 'wipe', dynamite: 'explode', fill: 'fill', undo: 'undo' };
 
   ['tornado', 'dynamite', 'fill', 'undo'].forEach(function(name) {
     var inst = _dockVM.viewModel(name);
     if (!inst) { console.warn('[rive-dock] missing VM instance for:', name); return; }
     _toolVMs[name] = inst;
+    _watchRelease(inst, name);
 
     // Listen for effect output triggers
     var effectTrig = inst.trigger(effectTriggerNames[name]);
@@ -266,6 +288,7 @@ function _bindViewModels() {
   var alienInst = _dockVM.viewModel('alien');
   if (alienInst) {
     _toolVMs.alien = alienInst;
+    _watchRelease(alienInst, 'alien');
     var blastTrig = alienInst.trigger('blast');
     if (blastTrig && typeof blastTrig.on === 'function') {
       blastTrig.on(function() {
@@ -360,7 +383,48 @@ export function riveDockStrokeEnd() {
   if (canvas) canvas.style.opacity = '';
 }
 
+// ── Release → action lockout ─────────────────────────────────────────────────
+// The action trigger only fires after the tool's drop animation finishes, so
+// locking the canvas at action time left the release→action window drawable.
+// Each tool VM fires a `release` trigger on drop; if DockVM.releaseReady is
+// true at that moment an action trigger is guaranteed to follow, so we take
+// the effectBusy lock immediately and hand it over to the effect when the
+// action trigger arrives (consumed in _fireEffect). If releaseReady is false
+// the tool just bounces back — no lock taken, nothing to get stuck on. A 6s
+// safety timeout frees the lock if the promised action trigger never shows.
+
+function _watchRelease(inst, name) {
+  var rel = inst.trigger('release');
+  if (!rel || typeof rel.on !== 'function') {
+    console.warn('[rive-dock] no release trigger on:', name);
+    return;
+  }
+  rel.on(function() {
+    if (!_releaseReadyBool || !_releaseReadyBool.value) return;
+    state.effectBusy++;
+    var tid = setTimeout(function() {
+      var idx = _pendingReleases.indexOf(tid);
+      if (idx !== -1) {
+        console.warn('[rive-dock] action trigger never arrived after release — freeing canvas lock');
+        _pendingReleases.splice(idx, 1);
+        state.effectBusy--;
+      }
+    }, 6000);
+    _pendingReleases.push(tid);
+  });
+}
+
+function _consumePendingRelease() {
+  var tid = _pendingReleases.shift();
+  if (tid !== undefined) {
+    clearTimeout(tid);
+    state.effectBusy--;
+  }
+}
+
 function _fireEffect(toolName, dropX, dropY) {
+  // Hand the release lock over to the effect's own effectBusy accounting.
+  _consumePendingRelease();
   // Rive canvas is now inside #canvas-area, so dropX/dropY are already
   // canvas-area-relative — no offset subtraction needed.
   if (toolName === 'undo') {
