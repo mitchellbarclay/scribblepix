@@ -73,33 +73,28 @@ export function initToolbar() {
     });
   });
 
-  var saveBtn = document.getElementById('save-btn');
+}
 
-  // On touch devices, hand the PNG to the native share sheet so "Save Image"
-  // puts it straight in the photo library (a web app can't write there
-  // directly, and a download link makes iPad Safari offer "Open in Preview").
-  // Everything stays synchronous inside the click handler so WebKit's
-  // user-gesture token is live when navigator.share is called.
-  // Desktop (fine pointer) keeps the plain download.
-  function saveDrawing() {
-    var dataUrl = state.canvas.toDataURL('image/png');
-    var wantShare = navigator.share && window.matchMedia('(pointer: coarse)').matches;
-    if (wantShare) {
-      var bin = atob(dataUrl.split(',')[1]);
-      var bytes = new Uint8Array(bin.length);
-      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      var file = new File([bytes], 'scribblepix.png', { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file] }).catch(function() {}); // user closing the sheet rejects — fine
-        return;
-      }
+// On touch devices, hand the PNG to the native share sheet so "Save image"
+// puts it straight in the photo library (a web app can't write there directly,
+// and a download link makes iPad Safari offer "Open in Preview"). Everything
+// stays synchronous so WebKit's user-gesture token is live when navigator.share
+// is called. Desktop (fine pointer) keeps the plain download.
+export function saveDrawing() {
+  var dataUrl = state.canvas.toDataURL('image/png');
+  var wantShare = navigator.share && window.matchMedia('(pointer: coarse)').matches;
+  if (wantShare) {
+    var bin = atob(dataUrl.split(',')[1]);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    var file = new File([bytes], 'scribblepix.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file] }).catch(function() {}); // user closing the sheet rejects — fine
+      return;
     }
-    var a = document.createElement('a');
-    a.download = 'scribblepix.png';
-    a.href = dataUrl;
-    a.click();
   }
-
-  saveBtn.addEventListener('click', saveDrawing);
-  saveBtn.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+  var a = document.createElement('a');
+  a.download = 'scribblepix.png';
+  a.href = dataUrl;
+  a.click();
 }

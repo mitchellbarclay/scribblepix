@@ -2,13 +2,15 @@
 // slots (never a partial tool), scrolling snaps one tool at a time, and when
 // the list overflows the top/bottom slot is replaced by a scroll arrow.
 
-let viewport, toolList, upBtn, downBtn, pinEl, toolPill;
+let viewport, toolList, upBtn, downBtn, pinEl, toolPill, leftRail;
 
 const BTN = 46;            // tool button diameter
 const GAP = 14;            // gap between buttons in the list
 const PITCH = BTN + GAP;   // 60px — vertical distance from one tool to the next
 const PAD = 10;            // viewport top/bottom padding (matches CSS)
-const PIN_RESERVE = 60;    // space the pin steals when shown (52px pin + 8px gap)
+const RAIL_PAD = 12;       // left-rail padding (matches CSS)
+const RAIL_GAP = 8;        // gap between rail elements (matches CSS)
+const BRUSH_MIN = 120;     // min height reserved for the brush slider (matches CSS)
 
 let k = 0;          // number of whole tools scrolled past (top hidden count)
 let maxK = 0;       // max value of k
@@ -57,14 +59,20 @@ function goToK(nk, animate = true) {
 // Size the viewport to a whole number of tool slots based on available height.
 function relayout() {
   total = tools().length;
-  const pillH = toolPill.clientHeight;
-  // How many whole tools fit if the pin is hidden. N buttons need
-  // N*BTN + (N-1)*GAP = N*PITCH - GAP px (plus the viewport's 2*PAD).
-  let N = Math.floor((pillH - 2 * PAD + GAP) / PITCH);
-  if (N < total) {
-    // Overflow → the pin will show and eat space, so recompute with it reserved.
-    N = Math.floor((pillH - PIN_RESERVE - 2 * PAD + GAP) / PITCH);
-  }
+  // The tool list takes a whole number of slots; the brush slider (flex-grow)
+  // fills whatever's left, so we size against the rail's free height with the
+  // always-shown pin and a brush minimum reserved out of it.
+  //   left-rail column: [pin][gap][viewport] (tool-pill) [gap] [brush]
+  const railInner = leftRail.clientHeight - RAIL_PAD * 2;
+  const pinH = pinEl.offsetHeight || 70;
+  // Space below the pin, shared by the tool list and the brush slider.
+  const free = railInner - pinH - RAIL_GAP /*pin↔list*/ - RAIL_GAP /*list↔brush*/;
+  // Aim the tool list at ~65% and let the brush flex-grow into the ~35%
+  // remainder — the inverse of the right rail's 35/65 modifier/base split.
+  // Snapping to whole slots means the brush absorbs the rounding slack too.
+  const toolBudget = free * 0.65;
+  // N buttons need N*BTN + (N-1)*GAP = N*PITCH - GAP px (plus the viewport's 2*PAD).
+  let N = Math.floor((toolBudget - 2 * PAD + GAP) / PITCH);
   visibleN = clamp(N, 1, total);
   maxK = Math.max(0, total - visibleN);
   const contentH = visibleN * BTN + (visibleN - 1) * GAP;
@@ -74,9 +82,9 @@ function relayout() {
 
 export function updateActiveToolPin() {
   const activeBtn = document.querySelector('.tool-btn.active');
-  // Pin is shown whenever the palette overflows (is scrollable), a consistent
-  // anchor for the current tool. Hidden when every tool fits without scrolling.
-  if (!activeBtn || maxK === 0) {
+  // The pin always shows the current tool, a consistent anchor at the top of
+  // the rail regardless of whether the palette is scrollable.
+  if (!activeBtn) {
     pinEl.classList.remove('visible');
     toolPill.classList.remove('pin-active');
     return;
@@ -95,6 +103,7 @@ export function initToolbarOverflow() {
   downBtn = document.getElementById('tool-overflow-down');
   pinEl = document.getElementById('active-tool-pin');
   toolPill = document.getElementById('tool-pill');
+  leftRail = document.getElementById('left-rail');
 
   upBtn.addEventListener('click', () => goToK(k - 1));
   downBtn.addEventListener('click', () => goToK(k + 1));

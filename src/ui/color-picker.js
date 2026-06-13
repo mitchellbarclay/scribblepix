@@ -1,141 +1,95 @@
 import state from '../state.js';
-import { colorAtPos, rgbToHex, lightenColor, darkenColor } from '../core/color-utils.js';
+import { colorAtPos, rgbToHex, rgbToHsl, hslToRgbCss, parseColorRgb, lightenColor, darkenColor } from '../core/color-utils.js';
 import { updateBrushPreview } from './brush-slider.js';
+import { makeVerticalSlider } from './vertical-slider.js';
 
-var colorTrack, colorHandle;
-var colorDragging = false;
-var colorGrabY = 0;
-var colorCachedTrackTop = 0, colorCachedMaxTop = 0, colorCachedHandleH = 0;
-var colorRafScheduled = false, colorPendingY = 0;
-var colorP = 0.5;
+// Colour picking is split into two sliders:
+//   • base slider  — the full rainbow ramp (keeps white & dark ends, so a child
+//     who only uses one slider can still reach every basic colour);
+//   • modifier slider — shifts the base lighter (top) or darker (bottom),
+//     centred = base untouched, clamped short of pure white / black.
+// The final colour = modifier(base) and drives state.color, the swatch and the
+// theme.
 
-function cacheColorRects() {
-  var tr = colorTrack.getBoundingClientRect();
-  colorCachedTrackTop = tr.top;
-  colorCachedHandleH = colorHandle.offsetHeight;
-  colorCachedMaxTop = colorTrack.clientHeight - colorCachedHandleH;
+var baseTrack, baseHandle, modTrack, modHandle, swatchEl;
+var baseSlider, modSlider;
+var baseP = 0.5, modP = 0.5;
+
+// Total lightness swing across the modifier slider (±half this from centre).
+var MOD_RANGE = 0.52;
+
+// Apply the light/dark modifier to a base rgb, returning an rgb array.
+function applyModifier(rgb, mp) {
+  var dl = (0.5 - mp) * MOD_RANGE;           // top (mp<0.5) lightens, bottom darkens
+  var hsl = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+  var s = dl > 0 ? Math.min(1, hsl[1] + 0.04) : hsl[1]; // keep tints from washing to grey
+  var l = Math.max(0.16, Math.min(0.9, hsl[2] + dl));   // never quite white/black
+  return parseColorRgb(hslToRgbCss(hsl[0], s, l));
 }
 
-var bgPendingP = null, bgRafScheduled = false;
-function updateBackground(p) {
-  bgPendingP = p;
+// ── Theme — derived from the FINAL colour (unchanged behaviour, new input) ────
+var bgPending = null, bgRafScheduled = false;
+function updateBackground(finalRgb) {
+  bgPending = finalRgb;
   if (bgRafScheduled) return;
   bgRafScheduled = true;
   requestAnimationFrame(function() {
     bgRafScheduled = false;
-    var pp = bgPendingP;
-    var baseCenter = colorAtPos(pp);
-    var nearWhite = baseCenter[0] > 240 && baseCenter[1] > 240 && baseCenter[2] > 240;
+    var rgb = bgPending;
+    var nearWhite = rgb[0] > 240 && rgb[1] > 240 && rgb[2] > 240;
     var c1, c2, c3;
     if (nearWhite) {
       c1 = [232,236,240]; c2 = [218,223,229]; c3 = [198,205,213];
     } else {
-      c1 = lightenColor(colorAtPos(Math.max(0, pp-0.18)), 0.78);
-      c2 = lightenColor(baseCenter, 0.78);
-      c3 = lightenColor(colorAtPos(Math.min(1, pp+0.18)), 0.78);
+      c1 = lightenColor(rgb, 0.84);
+      c2 = lightenColor(rgb, 0.78);
+      c3 = lightenColor(rgb, 0.72);
     }
     document.body.style.setProperty('--bg-c1', 'rgb('+c1.join(',')+')');
     document.body.style.setProperty('--bg-c2', 'rgb('+c2.join(',')+')');
     document.body.style.setProperty('--bg-c3', 'rgb('+c3.join(',')+')');
-    var baseRgb = colorAtPos(pp);
-    var rail = lightenColor(baseRgb, 0.62);
+    var rail = lightenColor(rgb, 0.62);
     document.body.style.setProperty('--rail-bg', 'rgba('+rail[0]+','+rail[1]+','+rail[2]+',0.55)');
-    document.body.style.setProperty('--accent', 'rgb('+baseRgb.join(',')+')');
-    var accDark = darkenColor(baseRgb, 0.45);
+    document.body.style.setProperty('--accent', 'rgb('+rgb.join(',')+')');
+    var accDark = darkenColor(rgb, 0.45);
     document.body.style.setProperty('--accent-dark', 'rgb('+accDark.join(',')+')');
   });
 }
 
-function applyColorHandleTop(topPx) {
-  var maxTop = colorCachedMaxTop > 0 ? colorCachedMaxTop : (colorTrack.clientHeight - colorHandle.offsetHeight);
-  topPx = Math.max(0, Math.min(maxTop, topPx));
-  colorHandle.style.top = topPx + 'px';
-  colorP = maxTop > 0 ? topPx/maxTop : 0;
-  var rgb = colorAtPos(colorP);
-  state.color = rgbToHex(rgb);
-  colorHandle.style.background = state.color;
-  updateBackground(colorP);
+// Paint the modifier track to preview its actual range for the current hue:
+// lightest at top → base in the middle → darkest at bottom.
+function updateModifierTrack(baseRgb) {
+  if (!modTrack) return;
+  var top = applyModifier(baseRgb, 0);
+  var bot = applyModifier(baseRgb, 1);
+  modTrack.style.background = 'linear-gradient(to bottom, rgb('+top.join(',')+'), rgb('+baseRgb.join(',')+') 50%, rgb('+bot.join(',')+'))';
+}
+
+function recompute() {
+  var baseRgb = colorAtPos(baseP);
+  var finalRgb = applyModifier(baseRgb, modP);
+  state.color = rgbToHex(finalRgb);
+  if (swatchEl) swatchEl.style.background = state.color;
+  updateModifierTrack(baseRgb);
+  updateBackground(finalRgb);
   updateBrushPreview();
 }
 
-function startColorJumpDrag(clientY) {
-  cacheColorRects();
-  var targetTop = clientY - colorCachedTrackTop - colorCachedHandleH/2;
-  colorHandle.classList.add('jumping');
-  applyColorHandleTop(targetTop);
-  colorGrabY = colorCachedHandleH/2;
-  colorDragging = true;
-  colorHandle.classList.remove('anim-release', 'anim-press');
-  colorHandle.offsetHeight;
-  colorHandle.classList.add('grabbing', 'anim-press');
-  setTimeout(function() { colorHandle.classList.remove('jumping'); }, 200);
-}
-
-export function onColorMove(clientY) {
-  if (!colorDragging) return;
-  colorPendingY = clientY;
-  if (colorRafScheduled) return;
-  colorRafScheduled = true;
-  requestAnimationFrame(function() {
-    colorRafScheduled = false;
-    if (!colorDragging) return;
-    applyColorHandleTop(colorPendingY - colorCachedTrackTop - colorGrabY);
-  });
-}
-
-export function onColorRelease() {
-  if (!colorDragging) return;
-  colorDragging = false;
-  colorHandle.classList.remove('grabbing', 'anim-press');
-  colorHandle.offsetHeight;
-  colorHandle.classList.add('anim-release');
-  colorHandle.addEventListener('animationend', function h() {
-    colorHandle.removeEventListener('animationend', h);
-    colorHandle.classList.remove('anim-release');
-  });
-}
+// main.js forwards window-level pointer moves/releases here; fan them out to
+// whichever colour slider is currently being dragged (each ignores if idle).
+export function onColorMove(clientY) { baseSlider.move(clientY); modSlider.move(clientY); }
+export function onColorRelease() { baseSlider.release(); modSlider.release(); }
 
 export function initColorPicker() {
-  colorTrack = document.getElementById('color-track');
-  colorHandle = document.getElementById('color-handle');
+  baseTrack = document.getElementById('color-track');
+  baseHandle = document.getElementById('color-handle');
+  modTrack = document.getElementById('mod-track');
+  modHandle = document.getElementById('mod-handle');
+  swatchEl = document.getElementById('color-swatch');
 
-  var maxTop = colorTrack.clientHeight - colorHandle.offsetHeight;
-  applyColorHandleTop(maxTop * 0.5);
+  baseSlider = makeVerticalSlider(baseTrack, baseHandle, function(p) { baseP = p; recompute(); });
+  modSlider = makeVerticalSlider(modTrack, modHandle, function(p) { modP = p; recompute(); });
 
-  colorHandle.addEventListener('mousedown', function(e) {
-    e.preventDefault(); e.stopPropagation();
-    cacheColorRects();
-    var r = colorHandle.getBoundingClientRect();
-    colorGrabY = e.clientY - r.top;
-    colorDragging = true;
-    colorHandle.classList.remove('anim-release', 'anim-press');
-    colorHandle.offsetHeight;
-    colorHandle.classList.add('grabbing', 'anim-press');
-  });
-  colorHandle.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    cacheColorRects();
-    var r = colorHandle.getBoundingClientRect();
-    colorGrabY = e.touches[0].clientY - r.top;
-    colorDragging = true;
-    colorHandle.classList.remove('anim-release', 'anim-press');
-    colorHandle.offsetHeight;
-    colorHandle.classList.add('grabbing', 'anim-press');
-  }, {passive: false});
-
-  colorTrack.addEventListener('mousedown', function(e) {
-    e.preventDefault();
-    startColorJumpDrag(e.clientY);
-  });
-  colorTrack.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    startColorJumpDrag(e.touches[0].clientY);
-  }, {passive: false});
-
-  new ResizeObserver(function() { requestAnimationFrame(function() {
-    cacheColorRects();
-    var maxTop = colorCachedMaxTop;
-    if (maxTop <= 0) { applyColorHandleTop(0); return; }
-    applyColorHandleTop(colorP * maxTop);
-  }); }).observe(colorTrack);
+  modSlider.setP(0.5);
+  baseSlider.setP(0.5);
 }

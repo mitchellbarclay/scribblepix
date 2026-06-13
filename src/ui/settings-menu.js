@@ -1,5 +1,8 @@
+// Lets the app menu deep-link to a specific settings page (About / Install).
+let _openSettingsTo = () => {};
+export function openSettings(pageIndex) { _openSettingsTo(pageIndex || 0); }
+
 export function initSettingsMenu() {
-  const btn = document.getElementById('settings-btn');
   const overlay = document.getElementById('settings-overlay');
   const panel = document.getElementById('settings-panel');
   const body = panel.querySelector('.spanel-body');
@@ -10,8 +13,12 @@ export function initSettingsMenu() {
 
   let heightCleanup = null;
 
-  btn.addEventListener('click', () => openPanel());
-  btn.addEventListener('contextmenu', e => e.preventDefault());
+  // Open the panel directly on a chosen page (used by the app menu).
+  _openSettingsTo = (i) => {
+    tabs.forEach((t, j) => t.classList.toggle('active', j === i));
+    pages.forEach((p, j) => p.classList.toggle('active', j === i));
+    openPanel();
+  };
 
   // ── Pill ──────────────────────────────────────────────────────────────────
 

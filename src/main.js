@@ -17,6 +17,7 @@ import { initToolbar, hideRectSubmenu, hideEllipseSubmenu } from './ui/toolbar.j
 import { initToolbarOverflow } from './ui/toolbar-overflow.js';
 import { initRiveDock, setRiveDockActive, riveDockStrokeHit, riveDockStrokeEnd } from './ui/rive-dock.js';
 import { initSettingsMenu } from './ui/settings-menu.js';
+import { initAppMenu } from './ui/app-menu.js';
 import { warmupTools } from './tools/prewarm.js';
 
 // Init DOM refs into state
@@ -148,6 +149,7 @@ initColorPicker();
 initToolbar();
 initToolbarOverflow();
 initSettingsMenu();
+initAppMenu();
 initRiveDock();
 setRiveDockActive(true);
 
