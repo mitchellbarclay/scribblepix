@@ -56,21 +56,28 @@ function updateBackground(finalRgb) {
   });
 }
 
+// At the hard ends of the base slider, lock to pure white / pure black and
+// ignore the modifier — so black & white are always one slider away.
+var WHITE_END = 0.025, BLACK_END = 0.975;
+
 // Paint the modifier track to preview its actual range for the current hue:
-// lightest at top → base in the middle → darkest at bottom.
-function updateModifierTrack(baseRgb) {
+// lightest at top → base in the middle → darkest at bottom. At a locked end
+// it shows flat (the modifier has no effect there).
+function updateModifierTrack(baseRgb, flat) {
   if (!modTrack) return;
+  if (flat) { modTrack.style.background = 'rgb('+baseRgb.join(',')+')'; return; }
   var top = applyModifier(baseRgb, 0);
   var bot = applyModifier(baseRgb, 1);
   modTrack.style.background = 'linear-gradient(to bottom, rgb('+top.join(',')+'), rgb('+baseRgb.join(',')+') 50%, rgb('+bot.join(',')+'))';
 }
 
 function recompute() {
-  var baseRgb = colorAtPos(baseP);
-  var finalRgb = applyModifier(baseRgb, modP);
+  var atWhite = baseP <= WHITE_END, atBlack = baseP >= BLACK_END;
+  var baseRgb = atWhite ? [255, 255, 255] : atBlack ? [0, 0, 0] : colorAtPos(baseP);
+  var finalRgb = (atWhite || atBlack) ? baseRgb : applyModifier(baseRgb, modP);
   state.color = rgbToHex(finalRgb);
   if (swatchEl) swatchEl.style.background = state.color;
-  updateModifierTrack(baseRgb);
+  updateModifierTrack(baseRgb, atWhite || atBlack);
   updateBackground(finalRgb);
   updateBrushPreview();
 }

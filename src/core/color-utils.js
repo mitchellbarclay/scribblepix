@@ -91,7 +91,7 @@ export var colorStops = [
   {pos:0.73, rgb:[255,229,63]},
   {pos:0.83, rgb:[255,127,63]},
   {pos:0.92, rgb:[255,63,63]},
-  {pos:1.00, rgb:[42,16,24]}
+  {pos:1.00, rgb:[0,0,0]}
 ];
 
 export function colorAtPos(p) {
