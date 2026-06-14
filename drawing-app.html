@@ -165,7 +165,7 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 .sb2 { width: 320px; height: 320px; background: radial-gradient(circle, rgba(255,95,162,0.20) 0%, transparent 70%); bottom: -80px; right: -80px; }
 .sb3 { width: 260px; height: 260px; background: radial-gradient(circle, rgba(63,255,138,0.14) 0%, transparent 70%); bottom: 30%; left: -80px; }
 #splash-content { display: flex; flex-direction: column; align-items: center; position: relative; z-index: 1; padding: 0 24px; }
-#splash-logo-row { display: flex; align-items: center; gap: 10px; margin-bottom: 52px; opacity: 0.7; }
+#splash-logo-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; opacity: 0.7; }
 #splash-logo-img { width: 34px; height: 34px; }
 #splash-logo-name { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 22px; color: rgba(255,255,255,0.90); letter-spacing: 0.03em; }
 #splash-draw-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; width: min(300px, 72vw); padding: 38px 40px; border: none; border-radius: 40px; cursor: pointer; background: linear-gradient(145deg, #ff8533 0%, #ff4d8a 100%); box-shadow: 0 16px 56px rgba(255,80,100,0.50), 0 4px 20px rgba(0,0,0,0.35); color: white; font-family: 'Fredoka', sans-serif; animation: splashFloat 2.6s ease-in-out infinite; touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent; margin-bottom: 44px; }
@@ -178,7 +178,7 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 .splash-sec-btn:hover { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.88); border-color: rgba(255,255,255,0.32); }
 .splash-sec-btn:active { transform: scale(0.94); }
 .splash-sec-btn .mir { font-size: 16px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; color: rgba(255,255,255,0.45); }
-#splash-blurb { font-family: 'Fredoka', sans-serif; font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.32); text-align: center; max-width: 300px; line-height: 1.55; }
+#splash-blurb { font-family: 'Fredoka', sans-serif; font-size: 16px; font-weight: 400; color: rgba(255,255,255,0.42); text-align: center; max-width: 340px; line-height: 1.5; margin-bottom: 40px; }
 
 /* ── Install popup ── */
 #splash-install-popup { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,0.42); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity 0.24s ease; }
@@ -420,6 +420,7 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
       <img id="splash-logo-img" src="app-icons/logo-icon.svg" alt="">
       <span id="splash-logo-name">Scribblepix</span>
     </div>
+    <p id="splash-blurb">A free, open space for kids to draw and create — no in-app purchases, no flashy game gimmicks. Just colour, imagination, and room to make something of your own.</p>
     <button id="splash-draw-btn">
       <span id="splash-draw-icon" class="mir">draw</span>
       <span id="splash-draw-label">Start Drawing</span>
@@ -428,7 +429,6 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
       <button class="splash-sec-btn" id="splash-open-btn"><span class="mir">image</span>Open image</button>
       <button class="splash-sec-btn" id="splash-install-btn"><span class="mir">ios_share</span>Install app</button>
     </div>
-    <p id="splash-blurb">A free, open space for kids to draw and create — no in-app purchases, no flashy game gimmicks. Just colour, imagination, and room to make something of your own.</p>
   </div>
 
   <!-- Install popup -->
