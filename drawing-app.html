@@ -105,7 +105,7 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 .rect-sub-btn img, .ellipse-sub-btn img { width: 100%; height: 100%; image-rendering: auto; pointer-events: none; display: block; }
 
 /* ── App menu (canvas top-right) ─────────────────────────────────────────── */
-#app-menu-btn { position: absolute; top: 16px; right: 16px; z-index: 400; height: 48px; padding: 0 20px; display: flex; align-items: center; gap: 12px; background: #ffffff; border: 1px solid #dadada; border-radius: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); cursor: pointer; user-select: none; transition: transform 0.12s, box-shadow 0.15s; }
+#app-menu-btn { position: absolute; top: 16px; right: 16px; z-index: 400; height: 48px; padding: 0 20px; display: flex; align-items: center; gap: 12px; background: #ffffff; border: 1px solid #dadada; border-radius: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); cursor: pointer; user-select: none; transition: transform 0.12s, box-shadow 0.15s, opacity 0.22s ease; }
 #app-menu-btn:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.16); }
 #app-menu-btn:active { transform: scale(0.96); }
 .app-menu-lines { display: flex; flex-direction: column; gap: 4px; }
@@ -189,8 +189,8 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
         <button class="tool-btn" data-tool="vine"><img src="icons/leaf.svg" alt=""></button>
         <button class="tool-btn" data-tool="flower"><img src="icons/flower.svg" alt=""></button>
         <button class="tool-btn" data-tool="pipe"><img src="icons/pipe.svg" alt=""></button>
-        <button class="tool-btn" data-tool="rect"><img src="icons/rect-outline.svg" alt=""></button>
-        <button class="tool-btn" data-tool="ellipse"><img src="icons/ellipse-outline.svg" alt=""></button>
+        <button class="tool-btn" data-tool="rect"><img src="icons/rect-pattern.svg" alt=""></button>
+        <button class="tool-btn" data-tool="ellipse"><img src="icons/ellipse-pattern.svg" alt=""></button>
         <button class="tool-btn" data-tool="threed"><img src="icons/cube.svg" alt=""></button>
         </div>
       </div>
@@ -204,25 +204,25 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 </div>
 
 <div id="rect-submenu">
-  <button class="rect-sub-btn active" data-rect-mode="outline" title="Outline">
+  <button class="rect-sub-btn" data-rect-mode="outline" title="Outline">
     <img src="icons/rect-outline.svg" alt="Outline">
   </button>
   <button class="rect-sub-btn" data-rect-mode="filled" title="Filled">
     <img src="icons/rect-filled.svg" alt="Filled">
   </button>
-  <button class="rect-sub-btn" data-rect-mode="pattern" title="Pattern">
+  <button class="rect-sub-btn active" data-rect-mode="pattern" title="Pattern">
     <img src="icons/rect-pattern.svg" alt="Pattern">
   </button>
 </div>
 
 <div id="ellipse-submenu">
-  <button class="ellipse-sub-btn active" data-ellipse-mode="outline" title="Outline">
+  <button class="ellipse-sub-btn" data-ellipse-mode="outline" title="Outline">
     <img src="icons/ellipse-outline.svg" alt="Outline">
   </button>
   <button class="ellipse-sub-btn" data-ellipse-mode="filled" title="Filled">
     <img src="icons/ellipse-filled.svg" alt="Filled">
   </button>
-  <button class="ellipse-sub-btn" data-ellipse-mode="pattern" title="Pattern">
+  <button class="ellipse-sub-btn active" data-ellipse-mode="pattern" title="Pattern">
     <img src="icons/ellipse-pattern.svg" alt="Pattern">
   </button>
 </div>

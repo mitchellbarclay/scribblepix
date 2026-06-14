@@ -6,6 +6,28 @@ import { openSettings } from './settings-menu.js';
 // The canvas-corner MENU button + dropdown. Nests what used to be the left-rail
 // settings cog and save button, plus a new "Open image" import.
 
+var _menuFaded = false;
+
+export function menuBtnStrokeHit(cx, cy) {
+  if (_menuFaded) return;
+  const btn = document.getElementById('app-menu-btn');
+  if (!btn) return;
+  const r = btn.getBoundingClientRect();
+  if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) {
+    _menuFaded = true;
+    btn.style.opacity = '0';
+    const dd = document.getElementById('app-menu-dropdown');
+    if (dd) dd.classList.remove('visible');
+  }
+}
+
+export function menuBtnStrokeEnd() {
+  if (!_menuFaded) return;
+  _menuFaded = false;
+  const btn = document.getElementById('app-menu-btn');
+  if (btn) btn.style.opacity = '';
+}
+
 export function initAppMenu() {
   const btn = document.getElementById('app-menu-btn');
   const dropdown = document.getElementById('app-menu-dropdown');

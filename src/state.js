@@ -62,13 +62,13 @@ const state = {
   // Rectangle
   rectStroke: null,
   rectAnimFrame: null,
-  rectSubTool: 'outline',
+  rectSubTool: 'pattern',
   rectBouncing: false,
 
   // Ellipse
   ellipseStroke: null,
   ellipseAnimFrame: null,
-  ellipseSubTool: 'outline',
+  ellipseSubTool: 'pattern',
   ellipseBouncing: false,
 
   // Vine

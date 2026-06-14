@@ -17,7 +17,7 @@ import { initToolbar, hideRectSubmenu, hideEllipseSubmenu } from './ui/toolbar.j
 import { initToolbarOverflow } from './ui/toolbar-overflow.js';
 import { initRiveDock, setRiveDockActive, riveDockStrokeHit, riveDockStrokeEnd } from './ui/rive-dock.js';
 import { initSettingsMenu } from './ui/settings-menu.js';
-import { initAppMenu } from './ui/app-menu.js';
+import { initAppMenu, menuBtnStrokeHit, menuBtnStrokeEnd } from './ui/app-menu.js';
 import { warmupTools } from './tools/prewarm.js';
 
 // Init DOM refs into state
@@ -87,6 +87,7 @@ state.canvas.addEventListener('mousemove', function(e) {
   }
   state.lastX = pos[0]; state.lastY = pos[1];
   riveDockStrokeHit(e.clientX, e.clientY);
+  menuBtnStrokeHit(e.clientX, e.clientY);
 });
 
 state.canvas.addEventListener('mouseup', function() {
@@ -94,7 +95,7 @@ state.canvas.addEventListener('mouseup', function() {
   finalizeVineStrokeV2(); finalizeFlowerStroke(); finalizeBoltStroke(); finalizeFireStroke();
   finalizeRectStroke(); finalizeEllipseStroke(); finalizePipeStroke(); finalizeThreeStroke();
   clearBrushPreview();
-  riveDockStrokeEnd();
+  riveDockStrokeEnd(); menuBtnStrokeEnd();
 });
 
 state.canvas.addEventListener('mouseleave', function() {
@@ -102,7 +103,7 @@ state.canvas.addEventListener('mouseleave', function() {
   finalizeVineStrokeV2(); finalizeFlowerStroke(); finalizeBoltStroke(); finalizeFireStroke();
   cancelRectStroke(); cancelEllipseStroke(); finalizePipeStroke(); finalizeThreeStroke();
   clearBrushPreview();
-  riveDockStrokeEnd();
+  riveDockStrokeEnd(); menuBtnStrokeEnd();
 });
 
 // On iOS/iPadOS, touchcancel fires instead of touchend when the OS interrupts the
@@ -113,7 +114,7 @@ state.canvas.addEventListener('touchcancel', function() {
   finalizeVineStrokeV2(); finalizeFlowerStroke(); finalizeBoltStroke(); finalizeFireStroke();
   cancelRectStroke(); cancelEllipseStroke(); finalizePipeStroke(); finalizeThreeStroke();
   clearBrushPreview();
-  riveDockStrokeEnd();
+  riveDockStrokeEnd(); menuBtnStrokeEnd();
 });
 
 // Touch → mouse passthrough
@@ -143,7 +144,7 @@ window.addEventListener('mouseup', function() {
   finalizePipeStroke();
   onSliderRelease();
   onColorRelease();
-  riveDockStrokeEnd();
+  riveDockStrokeEnd(); menuBtnStrokeEnd();
 });
 window.addEventListener('touchmove', function(e) {
   if (!e.touches.length) return;
