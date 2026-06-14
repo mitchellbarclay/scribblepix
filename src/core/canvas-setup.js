@@ -1,6 +1,7 @@
 import state from '../state.js';
 
 var MIN_WIN_W = 480, MIN_WIN_H = 420;
+var AGENT_MODE = new URLSearchParams(location.search).has('agent');
 
 export function blankColsFromEdge(data, w, h, fromRight) {
   var count = 0;
@@ -43,7 +44,7 @@ export function updateMiniBrowser() {
 
 export function applyResize() {
   state.resizeTimer = null;
-  var tooSmallNow = window.innerWidth < MIN_WIN_W || window.innerHeight < MIN_WIN_H;
+  var tooSmallNow = !AGENT_MODE && (window.innerWidth < MIN_WIN_W || window.innerHeight < MIN_WIN_H);
   var sizeWarning = document.getElementById('size-warning');
   if (tooSmallNow !== state.tooSmall) {
     state.tooSmall = tooSmallNow;
@@ -121,7 +122,7 @@ export function applyResize() {
 }
 
 export function resize() {
-  var tooSmallNow = window.innerWidth < MIN_WIN_W || window.innerHeight < MIN_WIN_H;
+  var tooSmallNow = !AGENT_MODE && (window.innerWidth < MIN_WIN_W || window.innerHeight < MIN_WIN_H);
   var sizeWarning = document.getElementById('size-warning');
   if (tooSmallNow !== state.tooSmall) {
     state.tooSmall = tooSmallNow;
