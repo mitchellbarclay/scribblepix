@@ -57,7 +57,7 @@ export function initToolbar() {
       state.rectSubTool = btn.dataset.rectMode;
       document.querySelectorAll('.rect-sub-btn').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
-      document.querySelector('[data-tool="rect"] img').src = 'icons/rect-' + state.rectSubTool + '.svg';
+      document.querySelector('[data-tool="rect"] img').src = 'icons/tools/rect-' + state.rectSubTool + '.svg';
       hideRectSubmenu();
     });
   });
@@ -68,7 +68,7 @@ export function initToolbar() {
       state.ellipseSubTool = btn.dataset.ellipseMode;
       document.querySelectorAll('.ellipse-sub-btn').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
-      document.querySelector('[data-tool="ellipse"] img').src = 'icons/ellipse-' + state.ellipseSubTool + '.svg';
+      document.querySelector('[data-tool="ellipse"] img').src = 'icons/tools/ellipse-' + state.ellipseSubTool + '.svg';
       hideEllipseSubmenu();
     });
   });
