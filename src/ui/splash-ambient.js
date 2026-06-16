@@ -38,6 +38,9 @@ var FADE_MS      = 9000;  // uniform fade-out duration
 var GAP_MS       = 120;   // pause after a stroke seals before the next begins
 var LAYER_ALPHA  = 0.85;  // opacity each stroke layer holds before fading
 var MAX_LAYERS   = 10;    // hard cap on concurrent layers (memory guard)
+var CANDIDATES   = 6;     // candidate paths generated per stroke; the emptiest wins
+var OCC_DECAY    = 0.5;   // per-stroke decay of the occupancy map (recent strokes weigh most)
+var GW = 12, GH = 9;      // occupancy-map grid resolution
 
 // A cheerful pastel palette that reads against the #c9effb splash background.
 var PALETTE = ['#ff8fb4', '#ffd166', '#7ed957', '#5ec8ff', '#b08bff', '#ff9e7a', '#5fd6c4'];
@@ -72,6 +75,7 @@ var layers = [];        // live layer descriptors { el, removeTimer, sealed }
 var cur = null;         // current playback { samples, idx, recipe, layer }
 var mode = 'idle';      // 'drawing' | 'settling' | 'gap'
 var phaseUntil = 0;
+var occ = null;         // recency-weighted occupancy map (Float32Array, GW*GH)
 
 function vw(splash) { return splash.clientWidth; }
 function vh(splash) { return splash.clientHeight; }
@@ -131,6 +135,7 @@ export function startSplashAmbient(splash) {
 
   running = true;
   mode = 'gap'; phaseUntil = 0; queue = []; cur = null; layers = [];
+  occ = new Float32Array(GW * GH);
   rafId = requestAnimationFrame(frame);
 
   window.addEventListener('resize', onResize);
@@ -300,6 +305,35 @@ function boundsOf(samples, pad) {
   return { bx: minx, by: miny, w: maxx - minx, h: maxy - miny };
 }
 
+// ── Occupancy map (recency-weighted) ──────────────────────────────────────--
+// A coarse grid tracking where recent strokes landed. Each new stroke decays
+// the whole map then deposits its footprint, so the latest strokes dominate and
+// faded ones stop mattering — letting us steer new strokes toward empty space.
+function cellOf(x, y) {
+  var cx = Math.max(0, Math.min(GW - 1, Math.floor(x / state.canvasW * GW)));
+  var cy = Math.max(0, Math.min(GH - 1, Math.floor(y / state.canvasH * GH)));
+  return cy * GW + cx;
+}
+
+// Average occupancy along a candidate path — lower means emptier.
+function scorePath(samples) {
+  if (!occ) return 0;
+  var sum = 0;
+  for (var i = 0; i < samples.length; i++) sum += occ[cellOf(samples[i].x, samples[i].y)];
+  return sum / samples.length;
+}
+
+// Decay every cell, then mark the cells this stroke crossed.
+function depositPath(samples) {
+  if (!occ) return;
+  for (var i = 0; i < occ.length; i++) occ[i] *= OCC_DECAY;
+  var seen = {};
+  for (var j = 0; j < samples.length; j++) {
+    var c = cellOf(samples[j].x, samples[j].y);
+    if (!seen[c]) { occ[c] += 1; seen[c] = 1; }
+  }
+}
+
 function nextRecipe() {
   if (!queue.length) {
     queue = RECIPES.slice();
@@ -317,8 +351,18 @@ function beginStroke() {
   // pad = how far this brush paints beyond its path. Used both to size the layer
   // and (plus slack) as the off-screen buffer, so start/end caps stay clipped.
   var pad = state.brushSize * recipe.padMul + 30;
-  var samples = densify(buildPath(recipe.curvy, pad + 40));
-  if (samples.length < 2) { mode = 'gap'; phaseUntil = performance.now(); return; }
+
+  // Generate several candidate paths and keep the one that crosses the emptiest
+  // part of the canvas, so consecutive strokes spread out instead of stacking.
+  var samples = null, bestScore = Infinity;
+  for (var c = 0; c < CANDIDATES; c++) {
+    var cand = densify(buildPath(recipe.curvy, pad + 40));
+    if (cand.length < 2) continue;
+    var sc = scorePath(cand);
+    if (sc < bestScore) { bestScore = sc; samples = cand; }
+  }
+  if (!samples) { mode = 'gap'; phaseUntil = performance.now(); return; }
+  depositPath(samples);
 
   var layer = makeLayer(boundsOf(samples, pad));
   state.ctx = layer.ctx;
