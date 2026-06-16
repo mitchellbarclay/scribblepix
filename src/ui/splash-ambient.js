@@ -220,26 +220,26 @@ function sealLayer(layer) {
 }
 
 // ── Path generation ───────────────────────────────────────────────────────--
-// Pick a point just outside a random edge of the viewport.
-var OFFSCREEN = 80;
-function edgePoint(W, H, exclude) {
+// Pick a point `off` px outside a random edge of the viewport. `off` is the
+// stroke's brush reach plus slack, so its start/end caps land fully off-screen.
+function edgePoint(W, H, off, exclude) {
   var e; do { e = Math.floor(Math.random() * 4); } while (e === exclude);
-  if (e === 0) return { edge: 0, x: rand(0, W), y: -OFFSCREEN };       // top
-  if (e === 1) return { edge: 1, x: W + OFFSCREEN, y: rand(0, H) };    // right
-  if (e === 2) return { edge: 2, x: rand(0, W), y: H + OFFSCREEN };    // bottom
-  return { edge: 3, x: -OFFSCREEN, y: rand(0, H) };                    // left
+  if (e === 0) return { edge: 0, x: rand(0, W), y: -off };       // top
+  if (e === 1) return { edge: 1, x: W + off, y: rand(0, H) };    // right
+  if (e === 2) return { edge: 2, x: rand(0, W), y: H + off };    // bottom
+  return { edge: 3, x: -off, y: rand(0, H) };                    // left
 }
 
 // A wandering polyline that enters from one off-screen edge and exits another,
 // crossing the whole viewport. It heads gently toward the exit point while a
 // soft outward steer routes it around the central text band.
-function buildPath(curvy) {
+function buildPath(curvy, off) {
   var W = state.canvasW, H = state.canvasH;
   var cx = W / 2, cy = H / 2;
   var avoidRx = W * 0.34, avoidRy = H * 0.30; // soft text-protection ellipse
 
-  var start = edgePoint(W, H);
-  var end = edgePoint(W, H, start.edge);
+  var start = edgePoint(W, H, off);
+  var end = edgePoint(W, H, off, start.edge);
   var x = start.x, y = start.y;
   var ang = Math.atan2(end.y - y, end.x - x);
   var seg = 24;
@@ -310,14 +310,16 @@ function nextRecipe() {
 
 function beginStroke() {
   var recipe = nextRecipe();
-  var samples = densify(buildPath(recipe.curvy));
-  if (samples.length < 2) { mode = 'gap'; phaseUntil = performance.now(); return; }
-
   state.tool = recipe.tool;
   state.color = recipe.color();
   state.brushSize = recipe.size();
 
+  // pad = how far this brush paints beyond its path. Used both to size the layer
+  // and (plus slack) as the off-screen buffer, so start/end caps stay clipped.
   var pad = state.brushSize * recipe.padMul + 30;
+  var samples = densify(buildPath(recipe.curvy, pad + 40));
+  if (samples.length < 2) { mode = 'gap'; phaseUntil = performance.now(); return; }
+
   var layer = makeLayer(boundsOf(samples, pad));
   state.ctx = layer.ctx;
 
