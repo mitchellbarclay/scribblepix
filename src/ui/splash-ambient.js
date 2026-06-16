@@ -32,10 +32,10 @@ import { finalizePipeStroke } from '../tools/pipes-brush.js';
 
 // ── Tuning ──────────────────────────────────────────────────────────────────
 var DRAW_STEP    = 5.5;   // px advanced per frame (~330 px/s) — lower = slower draw
-var SETTLE_MS    = 900;   // after the path, let grow/flicker animations finish on the layer
+var SETTLE_MS    = 450;   // after the path, let grow/flicker animations finish on the layer
 var HOLD_MS      = 2200;  // stroke sits fully visible before it starts fading
 var FADE_MS      = 9000;  // uniform fade-out duration
-var GAP_MS       = 650;   // pause after a stroke seals before the next begins
+var GAP_MS       = 120;   // pause after a stroke seals before the next begins
 var LAYER_ALPHA  = 0.85;  // opacity each stroke layer holds before fading
 var MAX_LAYERS   = 10;    // hard cap on concurrent layers (memory guard)
 
