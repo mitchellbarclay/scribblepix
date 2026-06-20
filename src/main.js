@@ -188,6 +188,12 @@ if (window.requestIdleCallback) {
 fetch('version.json', { cache: 'no-store' })
   .then(function(r) { return r.json(); })
   .then(function(j) {
+    // Human-facing release version shown in the About modal (separate from the
+    // cache-buster `v`, which changes every push). Single source of truth.
+    if (j.name) {
+      var el = document.querySelector('.about-version');
+      if (el) el.textContent = 'Version ' + j.name;
+    }
     var seen = localStorage.getItem('tiny-draw-version');
     if (seen !== j.v) {
       localStorage.setItem('tiny-draw-version', j.v);
