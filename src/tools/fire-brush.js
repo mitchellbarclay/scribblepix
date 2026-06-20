@@ -2,9 +2,17 @@ import state from '../state.js';
 import { hexToRgb, rgbToHsl } from '../core/color-utils.js';
 
 var FIRE_SETTLE_MS = 300;
+// Newborn flames ramp up over this window instead of popping in at full alpha.
+var FIRE_FADE_IN_MS = 90;
 // Sweep reference in px/ms so flame direction is consistent regardless of input
 // device event rate (Apple Pencil fires at ~240 Hz vs finger at ~60 Hz).
 var FIRE_SWEEP_REF = 0.5;
+// Velocity EMA time constant (ms). Driving the smoothing by elapsed time rather
+// than per-event makes the response frame-rate independent.
+var FIRE_VEL_TAU = 35;
+// dt clamp window (ms). Floors out impossibly-short bursts and caps long stalls
+// so a janky frame can't collapse or spike the velocity estimate.
+var FIRE_DT_MIN = 3, FIRE_DT_MAX = 50;
 var _FIRE_N = 32;
 var _fireLastT = 0;
 
@@ -29,6 +37,28 @@ function fireBaseHue() {
   return hsl[0];
 }
 
+// Flame gradients depend only on hue + height, both constant per stamp, so they
+// are built once at placement and reused every frame. Coordinates are local
+// (post translate/rotate); CanvasGradients are not bound to a context, so a
+// gradient created from state.ctx paints correctly on the overlay too.
+function makeFlameGradients(hue, H) {
+  var grad = state.ctx.createLinearGradient(0,0,0,-H);
+  grad.addColorStop(0.00,'hsla('+hue+',95%,22%,0)');
+  grad.addColorStop(0.05,'hsla('+hue+',95%,32%,0.55)');
+  grad.addColorStop(0.25,'hsla('+(hue+4)+',98%,44%,0.72)');
+  grad.addColorStop(0.55,'hsla('+(hue+12)+',98%,54%,0.80)');
+  grad.addColorStop(0.80,'hsla('+(hue+24)+',98%,66%,0.85)');
+  grad.addColorStop(0.94,'hsla('+(hue+36)+',98%,80%,0.90)');
+  grad.addColorStop(1.00,'rgba(255,255,245,0.95)');
+  var core = state.ctx.createLinearGradient(0,0,0,-H*0.88);
+  core.addColorStop(0.00,'hsla('+(hue+8)+',98%,62%,0.70)');
+  core.addColorStop(0.20,'hsla('+(hue+14)+',98%,72%,0.80)');
+  core.addColorStop(0.55,'hsla('+(hue+26)+',98%,84%,0.90)');
+  core.addColorStop(0.85,'hsla('+(hue+40)+',95%,93%,0.95)');
+  core.addColorStop(1.00,'rgba(255,255,252,1.00)');
+  return {grad:grad, core:core};
+}
+
 function drawFlameDirectly(targetCtx, stamp, phaseTime, alphaOverride) {
   var v = stamp.lv, H = stamp.lH, baseHW = stamp.lBaseHW;
   var pre = stamp.lPre, lean = stamp.lLean, sqU = stamp.lSqU;
@@ -37,7 +67,6 @@ function drawFlameDirectly(targetCtx, stamp, phaseTime, alphaOverride) {
   var lPhase = v.lPhase + dt*stamp.phaseSpeed;
   var rPhase = v.rPhase + dt*stamp.phaseSpeed*1.17;
   var cPhase = v.cPhase + dt*stamp.phaseSpeed*0.73;
-  var hue = stamp.hue;
   var alpha = (alphaOverride !== undefined) ? alphaOverride : stamp.alpha;
 
   targetCtx.save();
@@ -64,24 +93,8 @@ function drawFlameDirectly(targetCtx, stamp, phaseTime, alphaOverride) {
     targetCtx.closePath();
   }
 
-  var grad = targetCtx.createLinearGradient(0,0,0,-H);
-  grad.addColorStop(0.00,'hsla('+hue+',95%,22%,0)');
-  grad.addColorStop(0.05,'hsla('+hue+',95%,32%,0.55)');
-  grad.addColorStop(0.25,'hsla('+(hue+4)+',98%,44%,0.72)');
-  grad.addColorStop(0.55,'hsla('+(hue+12)+',98%,54%,0.80)');
-  grad.addColorStop(0.80,'hsla('+(hue+24)+',98%,66%,0.85)');
-  grad.addColorStop(0.94,'hsla('+(hue+36)+',98%,80%,0.90)');
-  grad.addColorStop(1.00,'rgba(255,255,245,0.95)');
-  buildPath(1,1); targetCtx.fillStyle = grad; targetCtx.fill();
-
-  buildPath(0.62, 0.88);
-  var coreGrad = targetCtx.createLinearGradient(0,0,0,-H*0.88);
-  coreGrad.addColorStop(0.00,'hsla('+(hue+8)+',98%,62%,0.70)');
-  coreGrad.addColorStop(0.20,'hsla('+(hue+14)+',98%,72%,0.80)');
-  coreGrad.addColorStop(0.55,'hsla('+(hue+26)+',98%,84%,0.90)');
-  coreGrad.addColorStop(0.85,'hsla('+(hue+40)+',95%,93%,0.95)');
-  coreGrad.addColorStop(1.00,'rgba(255,255,252,1.00)');
-  targetCtx.fillStyle = coreGrad; targetCtx.fill();
+  buildPath(1,1); targetCtx.fillStyle = stamp.gradMain; targetCtx.fill();
+  buildPath(0.62, 0.88); targetCtx.fillStyle = stamp.gradCore; targetCtx.fill();
   targetCtx.restore();
 }
 
@@ -95,16 +108,20 @@ function fireOverlayFrame() {
   state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
   state.fireLiveStamps = state.fireLiveStamps.filter(function(stamp) {
     var age = now - stamp.born;
+    // Fade-in by real elapsed age (not the frozen settle pose time) so a flame
+    // that settles mid-ramp still finishes rising to full alpha smoothly.
+    var fade = age < FIRE_FADE_IN_MS ? age/FIRE_FADE_IN_MS : 1;
+    var a = stamp.alpha*fade;
     if (stamp.settleStart !== null) {
       var settleAge = now - stamp.settleStart;
       if (settleAge >= FIRE_SETTLE_MS) {
-        drawFlameDirectly(state.ctx, stamp, stamp.settleStart, stamp.alpha);
+        drawFlameDirectly(state.ctx, stamp, stamp.settleStart, a);
         return false;
       }
-      drawFlameDirectly(state.ovCtx, stamp, stamp.settleStart, stamp.alpha);
+      drawFlameDirectly(state.ovCtx, stamp, stamp.settleStart, a);
     } else {
       if (age >= stamp.lifetime) stamp.settleStart = now;
-      drawFlameDirectly(state.ovCtx, stamp, now, stamp.alpha);
+      drawFlameDirectly(state.ovCtx, stamp, now, a);
     }
     return true;
   });
@@ -163,12 +180,14 @@ function placeFlameStamp(x, y) {
     lLean[pi] = v.asym*Math.sin(pu*Math.PI)*lBaseHW*1.2;
     lSqU[pi]  = Math.sqrt(pu);
   }
+  var grads = makeFlameGradients(hue, lH);
   var stampData = {
     x:x+jx, y:y+jy, rot:rot,
     variant:variant, height:height, hue:hue,
     alpha:0.62, born:now, phaseSpeed:0.005+Math.random()*0.004,
     lifetime:400+Math.random()*400, settleStart:null,
-    lv:v, lH:lH, lBaseHW:lBaseHW, lPre:lPre, lLean:lLean, lSqU:lSqU
+    lv:v, lH:lH, lBaseHW:lBaseHW, lPre:lPre, lLean:lLean, lSqU:lSqU,
+    gradMain:grads.grad, gradCore:grads.core
   };
   state.fireLiveStamps.push(stampData);
   if (state.mirrorMode) {
@@ -176,11 +195,18 @@ function placeFlameStamp(x, y) {
   }
 }
 
-export function drawFireStroke(x, y) {
+export function drawFireStroke(x, y, t) {
   var dx = x-state.lastX, dy = y-state.lastY;
   var dist = Math.hypot(dx, dy);
-  var now = performance.now();
-  var dt = Math.max(1, _fireLastT > 0 ? now - _fireLastT : 16);
+  // Prefer the hardware input timestamp (threaded from the event). It reflects
+  // when the touch actually happened, so it survives main-thread jank — unlike
+  // performance.now() read at handler-execution time, which inflates under load
+  // (the heavy fire render is exactly such a load) and collapses the velocity.
+  var now = (t !== undefined) ? t : performance.now();
+  // Clamp so a stalled frame (huge gap) or a coalesced burst (near-zero gap)
+  // can't wreck the estimate.
+  var dt = _fireLastT > 0 ? now - _fireLastT : 16;
+  dt = Math.min(FIRE_DT_MAX, Math.max(FIRE_DT_MIN, dt));
   _fireLastT = now;
   if (dist < 0.001) {
     state.fireVelX = 0; state.fireVelY = 0;
@@ -190,10 +216,11 @@ export function drawFireStroke(x, y) {
     if (!state.fireAnimFrame) state.fireAnimFrame = requestAnimationFrame(fireOverlayFrame);
     return;
   }
-  // Normalize by elapsed time so flame direction is the same at 60 Hz (finger/mouse)
-  // and 240 Hz (Apple Pencil) for equal physical stroke speed.
-  state.fireVelX = state.fireVelX*0.7+(dx/dt)*0.3;
-  state.fireVelY = state.fireVelY*0.7+(dy/dt)*0.3;
+  // Time-constant EMA on px/ms velocity: identical response at 60 Hz (finger/
+  // mouse) and 240 Hz (Apple Pencil) for equal physical stroke speed.
+  var a = 1 - Math.exp(-dt/FIRE_VEL_TAU);
+  state.fireVelX += ((dx/dt) - state.fireVelX)*a;
+  state.fireVelY += ((dy/dt) - state.fireVelY)*a;
   var spacing = Math.max(2, state.brushSize*0.45);
   var firstOffset = spacing - state.fireDistAcc;
   if (firstOffset < 0) firstOffset = 0;

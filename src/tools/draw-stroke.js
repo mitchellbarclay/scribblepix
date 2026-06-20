@@ -21,7 +21,7 @@ export function getPos(e) {
   return [s.clientX-r.left, s.clientY-r.top];
 }
 
-export function drawStroke(x, y) {
+export function drawStroke(x, y, t) {
   state.ctx.globalCompositeOperation = 'source-over'; state.ctx.globalAlpha = 1;
   var c = currentColor();
   var r = state.brushSize/2;
@@ -38,7 +38,7 @@ export function drawStroke(x, y) {
     if (state.mirrorMode) stampLine(state.ctx, state.canvasW-state.lastX, state.lastY, state.canvasW-x, y, es);
     state.ctx.globalCompositeOperation = 'source-over';
   } else if (state.tool === 'fire') {
-    drawFireStroke(x, y);
+    drawFireStroke(x, y, t);
   } else if (state.tool === 'bolt') {
     drawBoltStroke(x, y, c);
     if (state.mirrorMode) {

@@ -38,9 +38,20 @@ applyResize();
 window.addEventListener('resize', resize);
 new ResizeObserver(resize).observe(state.canvasArea);
 
+// Hardware input timestamp, immune to main-thread jank. Real (trusted) events
+// carry the true hardware time in e.timeStamp; synthetic mouse events dispatched
+// from the touch passthrough do not, so we thread the originating touch event's
+// timeStamp through state._inputT. Both share the performance.now() time origin.
+function inputTime(e) {
+  return e.isTrusted ? e.timeStamp : (state._inputT || performance.now());
+}
+
 // Canvas drawing event handlers
 function clearBrushPreview() {
-  if (state.tool === 'bolt' || state.tool === 'fire' || state.tool === 'pipe' || state.tool === 'threed') state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
+  // Note: 'fire' deliberately excluded — its rAF loop owns the overlay and clears
+  // it once all flames have settled. Clearing here on mouseup/leave would wipe the
+  // still-settling flames for one frame, producing a blink at stroke end.
+  if (state.tool === 'bolt' || state.tool === 'pipe' || state.tool === 'threed') state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
   if (state.tool === 'rect' && !state.rectBouncing) state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
   if (state.tool === 'ellipse' && !state.ellipseBouncing) state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
 }
@@ -76,13 +87,13 @@ state.canvas.addEventListener('mousedown', function(e) {
   state.painting = true; state.lastX = x; state.lastY = y;
   state.splatterGateX = null; state.splatterGateY = null;
   commitAllSplatterParticles();
-  drawStroke(x, y);
+  drawStroke(x, y, inputTime(e));
 });
 
 state.canvas.addEventListener('mousemove', function(e) {
   if (!state.painting) return;
   var pos = getPos(e);
-  drawStroke(pos[0], pos[1]);
+  drawStroke(pos[0], pos[1], inputTime(e));
   if (state.lastStrokePoints) {
     state.lastStrokePoints.push({x: pos[0], y: pos[1]});
     if (state.mirrorMode) state.lastStrokePoints.push({x: state.canvasW-pos[0], y: pos[1]});
@@ -122,10 +133,12 @@ state.canvas.addEventListener('touchcancel', function() {
 // Touch → mouse passthrough
 state.canvas.addEventListener('touchstart', function(e) {
   e.preventDefault();
+  state._inputT = e.timeStamp;
   state.canvas.dispatchEvent(new MouseEvent('mousedown', {clientX: e.touches[0].clientX, clientY: e.touches[0].clientY}));
 }, {passive: false});
 state.canvas.addEventListener('touchmove', function(e) {
   e.preventDefault();
+  state._inputT = e.timeStamp;
   state.canvas.dispatchEvent(new MouseEvent('mousemove', {clientX: e.touches[0].clientX, clientY: e.touches[0].clientY}));
 }, {passive: false});
 state.canvas.addEventListener('touchend', function(e) {
