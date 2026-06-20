@@ -137,16 +137,21 @@ export function initRiveDock() {
   // Stuck-drag safety: if a dock tool is being dragged and the pointer leaves
   // the rive canvas before releasing (mouse heading into a rail or out the
   // window), Rive never sees the pointer-up and the tool stays glued to a
-  // pointer it can no longer track. Fire the dragging tool's release trigger
-  // from JS so the state machine resolves it (bounce back or action, per
-  // releaseReady) instead of getting stuck.
+  // pointer it can no longer track. Resolve the drag so the tool returns to the
+  // dock *without* actioning: force releaseReady false (so the release leads to
+  // a plain bounce-back, never an effect) and clear dragging (otherwise the tool
+  // bounces back but stays at drag scale) before firing the release trigger.
   canvas.addEventListener('pointerleave', function() {
     if (!_riveCapturing) return;
     _riveCapturing = false;
+    if (_releaseReadyBool) _releaseReadyBool.value = false;
     Object.keys(_toolVMs).forEach(function(name) {
       var vm = _toolVMs[name];
       var dragging = vm.boolean && vm.boolean('dragging');
-      if (dragging && dragging.value) _fireTrigger(vm, 'release');
+      if (dragging && dragging.value) {
+        dragging.value = false;
+        _fireTrigger(vm, 'release');
+      }
     });
   });
 
