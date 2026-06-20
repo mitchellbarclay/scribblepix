@@ -135,6 +135,17 @@ export function resize() {
   }
   state.painting = false;
   updateMiniBrowser();
+  // Agent mode: agents drive the viewport programmatically and screenshot right
+  // away. The 180ms debounce + blurred "Resizing canvas…" overlay would leave a
+  // stale veil (setTimeout is throttled in headless previews, so the timer keeps
+  // resetting and may not fire) and canvasW briefly stuck at 0. Resize
+  // synchronously with no overlay so the canvas is always ready. Real users never
+  // have ?agent, so production behaviour is unchanged.
+  if (AGENT_MODE) {
+    state.canvasArea.classList.remove('resizing');
+    applyResize();
+    return;
+  }
   state.canvasArea.classList.add('resizing');
   if (state.resizeTimer) clearTimeout(state.resizeTimer);
   state.resizeTimer = setTimeout(function() {
