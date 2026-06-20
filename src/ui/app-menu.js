@@ -8,6 +8,17 @@ import { openSettings } from './settings-menu.js';
 
 var _menuFaded = false;
 
+// Called on stroke start: make the pill transparent to pointer events for the
+// whole stroke. Otherwise events over the solid pill route to the button (not
+// the canvas), so the canvas mousemove — and thus menuBtnStrokeHit — never fires
+// there, and the button hijacks the drag (selection cursor). With pointer-events
+// off, the canvas receives every move, detection is reliable, and you can draw
+// straight through the (faded) pill.
+export function menuBtnStrokeBegin() {
+  const btn = document.getElementById('app-menu-btn');
+  if (btn) btn.style.pointerEvents = 'none';
+}
+
 export function menuBtnStrokeHit(cx, cy) {
   if (_menuFaded) return;
   const btn = document.getElementById('app-menu-btn');
@@ -22,10 +33,12 @@ export function menuBtnStrokeHit(cx, cy) {
 }
 
 export function menuBtnStrokeEnd() {
-  if (!_menuFaded) return;
-  _menuFaded = false;
   const btn = document.getElementById('app-menu-btn');
-  if (btn) btn.style.opacity = '';
+  if (btn) {
+    btn.style.pointerEvents = '';
+    if (_menuFaded) btn.style.opacity = '';
+  }
+  _menuFaded = false;
 }
 
 export function initAppMenu() {

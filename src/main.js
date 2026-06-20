@@ -17,7 +17,7 @@ import { initToolbar, hideRectSubmenu, hideEllipseSubmenu } from './ui/toolbar.j
 import { initToolbarOverflow } from './ui/toolbar-overflow.js';
 import { initRiveDock, setRiveDockActive, riveDockStrokeHit, riveDockStrokeEnd } from './ui/rive-dock.js';
 import { initSettingsMenu } from './ui/settings-menu.js';
-import { initAppMenu, menuBtnStrokeHit, menuBtnStrokeEnd } from './ui/app-menu.js';
+import { initAppMenu, menuBtnStrokeBegin, menuBtnStrokeHit, menuBtnStrokeEnd } from './ui/app-menu.js';
 import { warmupTools } from './tools/prewarm.js';
 import { initSplashScreen } from './ui/splash-screen.js';
 
@@ -51,6 +51,7 @@ state.canvas.addEventListener('mousedown', function(e) {
   if (state.effectBusy > 0) return;
   if (state.tool === 'rect') hideRectSubmenu();
   if (state.tool === 'ellipse') hideEllipseSubmenu();
+  menuBtnStrokeBegin();
   var pos = getPos(e), x = pos[0], y = pos[1];
   saveHistory();
   state.mirrorVineStrokeV2 = null;
