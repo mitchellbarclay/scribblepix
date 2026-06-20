@@ -40,6 +40,7 @@ export function initRiveDock() {
     _sizeCanvas(canvas);
     if (_riveInst) _riveInst.resizeDrawingSurfaceToCanvas();
     _pushCanvasSize();
+    _syncDockColour();  // gradient sample depends on dock geometry
   }
 
   window.addEventListener('resize', _resync);
@@ -341,18 +342,54 @@ function _syncFillColor() {
   prop.value = _hexToArgb(state.color || '#000000');
 }
 
+// The page background is a 135° gradient: linear-gradient(135deg, c1 0%, c2 50%,
+// c3 100%) running top-left → bottom-right. For that angle the colour-stop
+// fraction at any viewport point (x,y) is simply t = (x+y)/(W+H). Return the
+// interpolated stop colour at t. Stops mirror updateBackground() in
+// color-picker.js, including the near-white clamp.
+function _bgGradientAt(rgb, t) {
+  var nearWhite = rgb[0] > 240 && rgb[1] > 240 && rgb[2] > 240;
+  var c1, c2, c3;
+  if (nearWhite) {
+    c1 = [232, 236, 240]; c2 = [218, 223, 229]; c3 = [198, 205, 213];
+  } else {
+    c1 = lightenColor(rgb, 0.84);
+    c2 = lightenColor(rgb, 0.78);
+    c3 = lightenColor(rgb, 0.72);
+  }
+  t = Math.max(0, Math.min(1, t));
+  var a, b, f;
+  if (t <= 0.5) { a = c1; b = c2; f = t / 0.5; }
+  else { a = c2; b = c3; f = (t - 0.5) / 0.5; }
+  return [
+    Math.round(a[0] + (b[0] - a[0]) * f),
+    Math.round(a[1] + (b[1] - a[1]) * f),
+    Math.round(a[2] + (b[2] - a[2]) * f)
+  ];
+}
+
 function _syncDockColour() {
   if (!_dockVM) return;
   var prop = _dockVM.color('dockColour');
   if (!prop) return;
   // Match the page background behind the canvas (full opacity) so the dock reads
-  // as a notch in the outer page. The body gradient runs c1→c2→c3 top→bottom;
-  // the dock sits flush with the canvas bottom, so it matches the bottom stop c3.
-  // Logic mirrors updateBackground() in color-picker.js, including near-white.
+  // as a notch in the outer page. Using the flat bottom stop (c3) is too dark:
+  // c3 only occurs at the bottom-RIGHT corner of the diagonal gradient, while
+  // the dock sits at the horizontal centre where the gradient is lighter.
+  // Sample the gradient at the dock's bottom edge — that edge is the only place
+  // the dock meets the page (its top edge borders the white canvas), so a perfect
+  // match there hides the seam.
   var rgb = hexToRgb(state.color || '#000000');
-  var nearWhite = rgb[0] > 240 && rgb[1] > 240 && rgb[2] > 240;
-  var c3 = nearWhite ? [198, 205, 213] : lightenColor(rgb, 0.72);
-  prop.value = ((0xFF << 24) | (c3[0] << 16) | (c3[1] << 8) | c3[2]) >>> 0;
+  var canvas = document.getElementById('rive-dock-canvas');
+  var t = 1;
+  if (canvas) {
+    var r = canvas.getBoundingClientRect();
+    var W = window.innerWidth || (r.left + r.width);
+    var H = window.innerHeight || r.bottom;
+    if (W + H > 0) t = (r.left + r.width / 2 + r.bottom) / (W + H);
+  }
+  var c = _bgGradientAt(rgb, t);
+  prop.value = ((0xFF << 24) | (c[0] << 16) | (c[1] << 8) | c[2]) >>> 0;
 }
 
 function _hexToArgb(hex) {
