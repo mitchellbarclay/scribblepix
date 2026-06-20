@@ -98,6 +98,19 @@ function drawFlameDirectly(targetCtx, stamp, phaseTime, alphaOverride) {
   targetCtx.restore();
 }
 
+// Settle pose time: while a flame is alive its pose time tracks real time 1:1
+// (phase advances at full speed). On settle we don't freeze it — instead the
+// pose time keeps advancing but decelerates linearly to a dead stop over the
+// settle window. g(t) = t - t^2/(2T) has g'(0)=1 (velocity-continuous with the
+// live animation, so no jerk) and g'(T)=0 (fully at rest), reaching settleStart
+// + T/2 at the end. The bake reuses this same final pose so the hand-off to the
+// main canvas is seamless.
+function settlePhaseTime(stamp, now) {
+  var t = now - stamp.settleStart;
+  if (t > FIRE_SETTLE_MS) t = FIRE_SETTLE_MS;
+  return stamp.settleStart + (t - t*t/(2*FIRE_SETTLE_MS));
+}
+
 function fireOverlayFrame() {
   if (!state.fireLiveStamps.length) {
     state.ovCtx.clearRect(0, 0, state.canvasW, state.canvasH);
@@ -115,10 +128,10 @@ function fireOverlayFrame() {
     if (stamp.settleStart !== null) {
       var settleAge = now - stamp.settleStart;
       if (settleAge >= FIRE_SETTLE_MS) {
-        drawFlameDirectly(state.ctx, stamp, stamp.settleStart, a);
+        drawFlameDirectly(state.ctx, stamp, settlePhaseTime(stamp, now), a);
         return false;
       }
-      drawFlameDirectly(state.ovCtx, stamp, stamp.settleStart, a);
+      drawFlameDirectly(state.ovCtx, stamp, settlePhaseTime(stamp, now), a);
     } else {
       if (age >= stamp.lifetime) stamp.settleStart = now;
       drawFlameDirectly(state.ovCtx, stamp, now, a);
@@ -141,7 +154,8 @@ export function finalizeFireStroke() {
 export function commitFireStrokeNow() {
   var now = performance.now();
   state.fireLiveStamps.forEach(function(stamp) {
-    drawFlameDirectly(state.ctx, stamp, stamp.settleStart || now, stamp.alpha);
+    var pt = stamp.settleStart !== null ? settlePhaseTime(stamp, now) : now;
+    drawFlameDirectly(state.ctx, stamp, pt, stamp.alpha);
   });
   state.fireLiveStamps = [];
   if (state.fireAnimFrame) { cancelAnimationFrame(state.fireAnimFrame); state.fireAnimFrame = null; }
