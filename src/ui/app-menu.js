@@ -1,7 +1,7 @@
 import state from '../state.js';
 import { saveHistory } from '../core/history.js';
 import { saveDrawing } from './toolbar.js';
-import { openSettings } from './settings-menu.js';
+import { openAbout, openInstall } from './settings-menu.js';
 
 // The canvas-corner MENU button + dropdown. Nests what used to be the left-rail
 // settings cog and save button, plus a new "Open image" import.
@@ -68,8 +68,8 @@ export function initAppMenu() {
     item.addEventListener('click', () => {
       const action = item.dataset.action;
       close();
-      if (action === 'about') openSettings(0);
-      else if (action === 'install') openSettings(1);
+      if (action === 'about') openAbout();
+      else if (action === 'install') openInstall();
       else if (action === 'save') saveDrawing();
       else if (action === 'open') fileInput.click();
     });

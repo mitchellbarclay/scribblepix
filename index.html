@@ -141,44 +141,38 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 .app-menu-item.small:hover { background: #E6E6E6; }
 .app-menu-item.small img { width: 20px; height: 20px; }
 
-/* ── Settings overlay ────────────────────────────────────────────────────── */
-#settings-overlay { position: fixed; inset: 0; z-index: 900; background: rgba(8,8,24,0.42); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
-#settings-overlay.visible { opacity: 1; pointer-events: auto; }
+/* ── Modals (About + Install) ────────────────────────────────────────────── */
+/* z-index sits above the splash screen (9000) so both modals can be opened
+   from the splash as well as the app menu. */
+.modal-overlay { position: fixed; inset: 0; z-index: 9500; background: rgba(8,8,24,0.42); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+.modal-overlay.visible { opacity: 1; pointer-events: auto; }
+.modal-panel { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%) scale(0.88); z-index: 9501; width: min(440px, calc(100vw - 48px)); max-height: calc(100vh - 80px); overflow-y: auto; background: #ffffff; border-radius: 30px; padding: 32px 28px 34px; box-shadow: 0 24px 72px rgba(0,0,0,0.28); opacity: 0; pointer-events: none; transition: opacity 0.32s ease, transform 0.40s cubic-bezier(0.34,1.56,0.64,1); font-family: 'Fredoka', sans-serif; color: #1a1a2e; }
+.modal-panel.visible { opacity: 1; pointer-events: auto; transform: translate(-50%,-50%) scale(1); }
+.modal-close { position: absolute; top: 20px; right: 20px; width: 34px; height: 34px; border-radius: 50%; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: rgba(26,26,46,0.55); transition: background 0.15s, color 0.15s, transform 0.18s cubic-bezier(0.34,1.56,0.64,1); }
+.modal-close:hover { background: rgba(0,0,0,0.06); color: rgba(26,26,46,0.90); }
+.modal-close:active { transform: scale(0.88); }
+.modal-close .mir { font-size: 24px; font-variation-settings: 'wght' 600; }
+
+/* ── About modal ─────────────────────────────────────────────────────────── */
+.about-wordmark { display: block; width: min(280px, 72%); height: auto; margin: 14px auto 0; -webkit-user-drag: none; user-select: none; }
+.about-version { text-align: center; font-size: 21px; font-weight: 600; color: #1488f5; margin: 18px 0; }
+.about-blurb { text-align: center; font-size: 17px; font-weight: 400; color: #3a4654; line-height: 1.5; max-width: 360px; margin: 0 auto 16px; }
+.about-free { text-align: center; font-size: 17px; font-weight: 400; color: #3a4654; }
+.about-free strong { color: #1488f5; font-weight: 600; }
+
+/* ── Install modal ───────────────────────────────────────────────────────── */
+.install-tabs { display: flex; gap: 12px; margin: 4px 0 22px; }
+.install-tab { flex: 1; border: none; cursor: pointer; padding: 14px 10px; border-radius: 999px; font-family: 'Fredoka', sans-serif; font-size: 17px; font-weight: 600; background: #eef1f4; color: #1488f5; letter-spacing: 0.01em; transition: background 0.2s ease, color 0.2s ease, transform 0.18s cubic-bezier(0.34,1.56,0.64,1); }
+.install-tab.active { background: #1488f5; color: #ffffff; }
+.install-tab:active { transform: scale(0.96); }
+.install-subtitle { text-align: center; font-size: 18px; font-weight: 600; color: #2a3340; margin-bottom: 16px; }
+.install-page { display: none; flex-direction: column; gap: 12px; }
+.install-page.active { display: flex; }
+.install-step { background: #eef1f4; border-radius: 16px; padding: 18px 22px; font-size: 17px; font-weight: 600; color: #1a2330; }
 
 /* ── Rive dock ───────────────────────────────────────────────────────────── */
 #rive-dock-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 200; transition: opacity 0.22s ease; }
 #canvas-area.resizing #rive-dock-canvas { display: none; }
-
-/* ── Settings panel ──────────────────────────────────────────────────────── */
-#settings-panel { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%) scale(0.88); z-index: 901; width: min(420px, calc(100vw - 48px)); max-height: calc(100vh - 80px); overflow: hidden; background: rgba(252,253,255,0.94); border: 1.5px solid rgba(255,255,255,0.95); border-radius: 30px; padding: 26px 26px 30px; box-shadow: 0 24px 72px rgba(0,0,0,0.30), 0 0 0 1px rgba(255,255,255,0.55); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); opacity: 0; pointer-events: none; transition: opacity 0.32s ease, transform 0.40s cubic-bezier(0.34,1.56,0.64,1); font-family: 'Fredoka', sans-serif; color: #1a1a2e; }
-.spanel-body { overflow: hidden; transition: height 0.30s cubic-bezier(0.25,0.46,0.45,0.94); }
-.spanel-body.settled { overflow-y: auto; }
-#settings-panel.visible { opacity: 1; pointer-events: auto; transform: translate(-50%,-50%) scale(1); }
-.spanel-close { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; border: none; background: rgba(0,0,0,0.07); cursor: pointer; display: flex; align-items: center; justify-content: center; color: rgba(26,26,46,0.45); transition: background 0.15s, color 0.15s, transform 0.18s cubic-bezier(0.34,1.56,0.64,1); }
-.spanel-close:hover { background: rgba(0,0,0,0.12); color: rgba(26,26,46,0.80); }
-.spanel-close:active { transform: scale(0.88); }
-.spanel-close .mir { font-size: 16px; }
-
-/* ── Settings tabs ───────────────────────────────────────────────────────── */
-.spanel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
-.stabs { display: flex; gap: 6px; background: rgba(0,0,0,0.055); border-radius: 16px; padding: 4px; flex: 1; position: relative; }
-.stab-pill { position: absolute; border-radius: 12px; background: var(--accent); box-shadow: 0 3px 10px rgba(108,184,182,0.40); pointer-events: none; z-index: 0; }
-.stab-pill.sliding { transition: left 0.30s cubic-bezier(0.34,1.56,0.64,1), width 0.30s cubic-bezier(0.34,1.56,0.64,1); }
-.stab { flex: 0 0 auto; border: none; cursor: pointer; padding: 10px 14px; border-radius: 12px; font-family: 'Fredoka', sans-serif; font-size: 15px; font-weight: 600; color: rgba(26,26,46,0.45); background: transparent; position: relative; z-index: 1; transition: color 0.22s ease, transform 0.18s cubic-bezier(0.34,1.56,0.64,1); letter-spacing: 0.01em; white-space: nowrap; }
-.stab.active { color: white; }
-.stab:active { transform: scale(0.95); }
-
-/* ── Settings pages ──────────────────────────────────────────────────────── */
-.spage { display: none; }
-.spage.active { display: block; }
-
-/* About page */
-.sabout-logo-wrap { display: flex; justify-content: center; margin-bottom: 16px; }
-.sabout-logo { width: 90px; height: 90px; }
-.sabout-name { text-align: center; font-size: 28px; font-weight: 600; letter-spacing: 0em; margin-bottom: 8px; background: linear-gradient(135deg, #1a1a2e 0%, #2d6a68 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-.sabout-blurb { text-align: center; font-size: 15px; font-weight: 500; color: rgba(26,26,46,0.58); line-height: 1.55; padding: 0 8px; margin-bottom: 22px; }
-.sabout-divider { height: 1px; background: rgba(0,0,0,0.07); border-radius: 1px; margin: 0 0 16px; }
-.sabout-footer { text-align: center; font-size: 12px; color: rgba(26,26,46,0.32); font-weight: 500; letter-spacing: 0.02em; }
 
 /* ── Splash screen ───────────────────────────────────────────────────────── */
 #splash-screen { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; background: #c9effb; transition: opacity 0.38s ease, transform 0.38s ease; transform-origin: center; overflow: hidden; }
@@ -206,38 +200,6 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 .td-sec-icon { width: 38px; height: auto; }
 .td-sec-label { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 17px; color: #23303c; letter-spacing: 0.01em; line-height: 1; white-space: nowrap; }
 
-/* ── Install popup ── */
-#splash-install-popup { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,0.42); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity 0.24s ease; }
-#splash-install-popup.visible { opacity: 1; pointer-events: auto; }
-.sip-card { width: min(380px, 100%); background: rgba(15,24,36,0.97); border: 1.5px solid rgba(255,255,255,0.11); border-radius: 28px; padding: 22px 22px 24px; max-height: calc(100vh - 80px); overflow-y: auto; box-shadow: 0 24px 72px rgba(0,0,0,0.55); }
-.sip-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.sip-title { font-family: 'Fredoka', sans-serif; font-size: 18px; font-weight: 600; color: rgba(255,255,255,0.88); letter-spacing: 0.01em; }
-.sip-close { width: 30px; height: 30px; border-radius: 50%; border: none; background: rgba(255,255,255,0.10); cursor: pointer; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.60); transition: background 0.15s, color 0.15s; flex-shrink: 0; }
-.sip-close:hover { background: rgba(255,255,255,0.18); color: rgba(255,255,255,0.90); }
-.sip-close .mir { font-size: 16px; }
-.sip-tabs { display: flex; background: rgba(255,255,255,0.07); border-radius: 14px; padding: 3px; margin-bottom: 16px; }
-.sip-tab { flex: 1; border: none; padding: 9px; border-radius: 11px; background: transparent; cursor: pointer; font-family: 'Fredoka', sans-serif; font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.45); transition: color 0.20s ease, background 0.20s ease; letter-spacing: 0.01em; }
-.sip-tab.active { background: rgba(255,255,255,0.14); color: rgba(255,255,255,0.92); }
-.sip-page { display: none; flex-direction: column; gap: 10px; }
-.sip-page.active { display: flex; }
-.sip-step { display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,0.06); border-radius: 16px; padding: 12px 14px; }
-.sip-step-text { flex: 1; min-width: 0; }
-.sip-step-label { font-family: 'Fredoka', sans-serif; font-size: 15px; font-weight: 500; color: rgba(255,255,255,0.85); line-height: 1.2; margin-bottom: 2px; }
-.sip-step-desc { font-family: 'Fredoka', sans-serif; font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.42); line-height: 1.4; }
-
-/* iPad instructions page */
-.sipad-title { font-size: 16px; font-weight: 500; color: rgba(26,26,46,0.65); margin-bottom: 14px; letter-spacing: 0.01em; }
-.sipad-steps { display: flex; flex-direction: column; gap: 10px; }
-.sipad-step { display: flex; align-items: center; gap: 14px; background: rgba(0,0,0,0.035); border-radius: 18px; padding: 13px 15px; }
-.sipad-step-num { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-.sipad-step-num .mir { font-size: 20px; color: white; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
-.sipad-step-num.s1 { background: linear-gradient(135deg, #3fa6ff, #6f5fff); }
-.sipad-step-num.s2 { background: linear-gradient(135deg, #c43dff, #6f5fff); }
-.sipad-step-num.s3 { background: linear-gradient(135deg, #ff7f3f, #ff5fa2); }
-.sipad-step-num.s4 { background: linear-gradient(135deg, #3fff8a, #3fa6ff); }
-.sipad-step-text { flex: 1; min-width: 0; }
-.sipad-step-label { font-size: 15px; font-weight: 500; color: #1a1a2e; line-height: 1.2; margin-bottom: 2px; }
-.sipad-step-desc { font-size: 13px; font-weight: 500; color: rgba(26,26,46,0.52); line-height: 1.4; }
 </style>
 </head>
 <body data-dock="rive">
@@ -352,96 +314,36 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
   </div>
 </div>
 
-<div id="settings-overlay"></div>
-<div id="settings-panel">
-  <div class="spanel-header">
-    <div class="stabs">
-      <div class="stab-pill"></div>
-      <button class="stab active">About</button>
-      <button class="stab">Add to iPad</button>
-      <button class="stab">Add to Android</button>
-    </div>
-    <button class="spanel-close" aria-label="Close"><span class="mir">close</span></button>
-  </div>
+<!-- About modal -->
+<div id="about-overlay" class="modal-overlay"></div>
+<div id="about-panel" class="modal-panel">
+  <button class="modal-close" aria-label="Close"><span class="mir">close</span></button>
+  <img class="about-wordmark" src="icons/logo/logo-wordmark.svg" alt="Tiny Draw">
+  <div class="about-version">Version 1.0</div>
+  <div class="about-blurb">A drawing app for kids, packed with tools that encourage exploration and creativity.</div>
+  <div class="about-free">No ads, no in-app purchases. <strong>Free forever</strong>.</div>
+</div>
 
-  <div class="spanel-body">
-  <div class="spage active">
-    <div class="sabout-logo-wrap">
-      <img class="sabout-logo" src="icons/logo/logo-icon.svg" alt="Tiny Draw logo">
-    </div>
-    <div class="sabout-name">Tiny Draw</div>
-    <div class="sabout-blurb">A free, open space for kids to draw and create — no in-app purchases, no flashy game gimmicks. Just colour, imagination, and room to make something of your own.</div>
-    <div class="sabout-divider"></div>
-    <div class="sabout-footer">© 2026 Tiny Draw</div>
+<!-- Install modal (shared by splash + app menu) -->
+<div id="install-overlay" class="modal-overlay"></div>
+<div id="install-panel" class="modal-panel">
+  <button class="modal-close" aria-label="Close"><span class="mir">close</span></button>
+  <div class="install-tabs">
+    <button class="install-tab active" data-device="ipad">Add to iPad</button>
+    <button class="install-tab" data-device="android">Add to Android</button>
   </div>
-
-  <div class="spage">
-    <div class="sipad-title">Add to your home screen</div>
-    <div class="sipad-steps">
-      <div class="sipad-step">
-        <div class="sipad-step-num s1"><span class="mir">language</span></div>
-        <div class="sipad-step-text">
-          <div class="sipad-step-label">Open in Safari</div>
-          <div class="sipad-step-desc">This app works best in Safari on your iPad.</div>
-        </div>
-      </div>
-      <div class="sipad-step">
-        <div class="sipad-step-num s2"><span class="mir">ios_share</span></div>
-        <div class="sipad-step-text">
-          <div class="sipad-step-label">Tap the Share button</div>
-          <div class="sipad-step-desc">The box-with-arrow icon in Safari's toolbar.</div>
-        </div>
-      </div>
-      <div class="sipad-step">
-        <div class="sipad-step-num s3"><span class="mir">add_box</span></div>
-        <div class="sipad-step-text">
-          <div class="sipad-step-label">Tap "Add to Home Screen"</div>
-          <div class="sipad-step-desc">Scroll down in the share sheet to find it.</div>
-        </div>
-      </div>
-      <div class="sipad-step">
-        <div class="sipad-step-num s4"><span class="mir">check_circle</span></div>
-        <div class="sipad-step-text">
-          <div class="sipad-step-label">Tap Add — you're done!</div>
-          <div class="sipad-step-desc">The app opens full screen, just like a real app.</div>
-        </div>
-      </div>
-    </div>
+  <div class="install-subtitle">Add to your home screen</div>
+  <div class="install-page active" data-device="ipad">
+    <div class="install-step">Open in Safari</div>
+    <div class="install-step">Tap the Share button</div>
+    <div class="install-step">Tap "Add to Home screen"</div>
+    <div class="install-step">You're done!</div>
   </div>
-
-  <div class="spage">
-    <div class="sipad-title">Add to your home screen</div>
-    <div class="sipad-steps">
-      <div class="sipad-step">
-        <div class="sipad-step-num s1"><span class="mir">public</span></div>
-        <div class="sipad-step-text">
-          <div class="sipad-step-label">Open in Chrome</div>
-          <div class="sipad-step-desc">This app works best in Chrome on your Android tablet.</div>
-        </div>
-      </div>
-      <div class="sipad-step">
-        <div class="sipad-step-num s2"><span class="mir">more_vert</span></div>
-        <div class="sipad-step-text">
-          <div class="sipad-step-label">Tap the menu button</div>
-          <div class="sipad-step-desc">The three-dot icon in the top-right corner of Chrome.</div>
-        </div>
-      </div>
-      <div class="sipad-step">
-        <div class="sipad-step-num s3"><span class="mir">add_to_home_screen</span></div>
-        <div class="sipad-step-text">
-          <div class="sipad-step-label">Tap "Add to Home screen"</div>
-          <div class="sipad-step-desc">Then tap Add to confirm.</div>
-        </div>
-      </div>
-      <div class="sipad-step">
-        <div class="sipad-step-num s4"><span class="mir">check_circle</span></div>
-        <div class="sipad-step-text">
-          <div class="sipad-step-label">You're all set!</div>
-          <div class="sipad-step-desc">The app opens full screen, just like a real app.</div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <div class="install-page" data-device="android">
+    <div class="install-step">Open in Chrome</div>
+    <div class="install-step">Tap the menu button</div>
+    <div class="install-step">Tap "Add to Home screen"</div>
+    <div class="install-step">You're done!</div>
   </div>
 </div>
 
@@ -470,56 +372,6 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
           <span class="td-sec-label">Install app</span>
         </span>
       </button>
-    </div>
-  </div>
-
-  <!-- Install popup -->
-  <div id="splash-install-popup">
-    <div class="sip-card">
-      <div class="sip-header">
-        <div class="sip-title">Add to your home screen</div>
-        <button class="sip-close" id="sip-close-btn"><span class="mir">close</span></button>
-      </div>
-      <div class="sip-tabs">
-        <button class="sip-tab active" data-sip-tab="ipad">iPad</button>
-        <button class="sip-tab" data-sip-tab="android">Android</button>
-      </div>
-      <div class="sip-page active" id="sip-page-ipad">
-        <div class="sip-step">
-          <div class="sipad-step-num s1"><span class="mir">language</span></div>
-          <div class="sip-step-text"><div class="sip-step-label">Open in Safari</div><div class="sip-step-desc">This app works best in Safari on your iPad.</div></div>
-        </div>
-        <div class="sip-step">
-          <div class="sipad-step-num s2"><span class="mir">ios_share</span></div>
-          <div class="sip-step-text"><div class="sip-step-label">Tap the Share button</div><div class="sip-step-desc">The box-with-arrow icon in Safari's toolbar.</div></div>
-        </div>
-        <div class="sip-step">
-          <div class="sipad-step-num s3"><span class="mir">add_box</span></div>
-          <div class="sip-step-text"><div class="sip-step-label">Tap "Add to Home Screen"</div><div class="sip-step-desc">Scroll down in the share sheet to find it.</div></div>
-        </div>
-        <div class="sip-step">
-          <div class="sipad-step-num s4"><span class="mir">check_circle</span></div>
-          <div class="sip-step-text"><div class="sip-step-label">Tap Add — you're done!</div><div class="sip-step-desc">The app opens full screen, just like a real app.</div></div>
-        </div>
-      </div>
-      <div class="sip-page" id="sip-page-android">
-        <div class="sip-step">
-          <div class="sipad-step-num s1"><span class="mir">public</span></div>
-          <div class="sip-step-text"><div class="sip-step-label">Open in Chrome</div><div class="sip-step-desc">This app works best in Chrome on Android.</div></div>
-        </div>
-        <div class="sip-step">
-          <div class="sipad-step-num s2"><span class="mir">more_vert</span></div>
-          <div class="sip-step-text"><div class="sip-step-label">Tap the three-dot menu</div><div class="sip-step-desc">In the top-right corner of Chrome.</div></div>
-        </div>
-        <div class="sip-step">
-          <div class="sipad-step-num s3"><span class="mir">add_to_home_screen</span></div>
-          <div class="sip-step-text"><div class="sip-step-label">Tap "Add to Home screen"</div><div class="sip-step-desc">Then tap Add to confirm.</div></div>
-        </div>
-        <div class="sip-step">
-          <div class="sipad-step-num s4"><span class="mir">check_circle</span></div>
-          <div class="sip-step-text"><div class="sip-step-label">You're all set!</div><div class="sip-step-desc">The app opens full screen, just like a real app.</div></div>
-        </div>
-      </div>
     </div>
   </div>
 </div>
