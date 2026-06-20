@@ -128,7 +128,7 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 .app-menu-item:active { transform: scale(0.97); }
 .app-menu-item img { display: block; }
 .app-menu-item.big { width: 100%; height: 60px; border-radius: 25px; font-size: 18px; }
-.app-menu-item.big img { width: 24px; height: 24px; }
+.app-menu-item.big img { width: 20px; height: 20px; }
 .app-menu-item.save { background: #007AF3; color: #ffffff; }
 .app-menu-item.save:hover { filter: brightness(1.06); }
 .app-menu-item.open { background: #E3F1FF; color: #23303C; }
@@ -168,7 +168,9 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 .install-subtitle { text-align: center; font-size: 18px; font-weight: 600; color: #2a3340; margin-bottom: 16px; }
 .install-page { display: none; flex-direction: column; gap: 12px; }
 .install-page.active { display: flex; }
-.install-step { background: #eef1f4; border-radius: 16px; padding: 18px 22px; font-size: 17px; font-weight: 600; color: #1a2330; }
+.install-step { background: #eef1f4; border-radius: 16px; padding: 14px 18px; font-size: 17px; font-weight: 600; color: #1a2330; display: flex; align-items: center; gap: 16px; }
+.install-step-icon { width: 28px; height: 28px; flex-shrink: 0; }
+.install-step-sub { font-size: 14px; font-weight: 400; color: #3a4654; margin-top: 2px; }
 
 /* ── Rive dock ───────────────────────────────────────────────────────────── */
 #rive-dock-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 200; transition: opacity 0.22s ease; }
@@ -334,16 +336,17 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
   </div>
   <div class="install-subtitle">Add to your home screen</div>
   <div class="install-page active" data-device="ipad">
-    <div class="install-step">Open in Safari</div>
-    <div class="install-step">Tap the Share button</div>
-    <div class="install-step">Tap "Add to Home screen"</div>
-    <div class="install-step">You're done!</div>
+    <div class="install-step"><img class="install-step-icon" src="icons/ui/install-safari-icon.svg" alt=""><span>Open in Safari</span></div>
+    <div class="install-step"><img class="install-step-icon" src="icons/ui/install-share-icon.svg" alt=""><span>Tap the Share button</span></div>
+    <div class="install-step"><img class="install-step-icon" src="icons/ui/install-viewmore-icon.svg" alt=""><span>Tap "View more"</span></div>
+    <div class="install-step"><img class="install-step-icon" src="icons/ui/install-plus-icon.svg" alt=""><span>Tap "Add to Home Screen"</span></div>
+    <div class="install-step"><img class="install-step-icon" src="icons/ui/install-tick-icon.svg" alt=""><div><div>You're done!</div><div class="install-step-sub">You can open it from your home screen like a regular app.</div></div></div>
   </div>
   <div class="install-page" data-device="android">
-    <div class="install-step">Open in Chrome</div>
-    <div class="install-step">Tap the menu button</div>
-    <div class="install-step">Tap "Add to Home screen"</div>
-    <div class="install-step">You're done!</div>
+    <div class="install-step"><img class="install-step-icon" src="icons/ui/install-chrome-icon.svg" alt=""><span>Open in Chrome</span></div>
+    <div class="install-step"><img class="install-step-icon" src="icons/ui/install-menubar-icon.svg" alt=""><span>Tap the menu button</span></div>
+    <div class="install-step"><img class="install-step-icon" src="icons/ui/install-plus-icon.svg" alt=""><span>Tap "Add to Home Screen"</span></div>
+    <div class="install-step"><img class="install-step-icon" src="icons/ui/install-tick-icon.svg" alt=""><div><div>You're done!</div><div class="install-step-sub">You can open it from your home screen like a regular app.</div></div></div>
   </div>
 </div>
 
