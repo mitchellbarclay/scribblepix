@@ -1,5 +1,5 @@
 {
-  "name": "drawing-app",
+  "name": "tiny-draw",
   "version": "1.0.0",
   "scripts": {
     "start": "npx serve . --listen 3000 --no-clipboard"

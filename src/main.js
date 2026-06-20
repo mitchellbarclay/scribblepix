@@ -187,11 +187,11 @@ if (window.requestIdleCallback) {
 fetch('version.json', { cache: 'no-store' })
   .then(function(r) { return r.json(); })
   .then(function(j) {
-    var seen = localStorage.getItem('scribblepix-version');
+    var seen = localStorage.getItem('tiny-draw-version');
     if (seen !== j.v) {
-      localStorage.setItem('scribblepix-version', j.v);
-      if (seen !== null && sessionStorage.getItem('scribblepix-reloaded') !== j.v) {
-        sessionStorage.setItem('scribblepix-reloaded', j.v);
+      localStorage.setItem('tiny-draw-version', j.v);
+      if (seen !== null && sessionStorage.getItem('tiny-draw-reloaded') !== j.v) {
+        sessionStorage.setItem('tiny-draw-reloaded', j.v);
         location.reload();
       }
     }

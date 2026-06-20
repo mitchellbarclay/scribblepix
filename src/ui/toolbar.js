@@ -87,14 +87,14 @@ export function saveDrawing() {
     var bin = atob(dataUrl.split(',')[1]);
     var bytes = new Uint8Array(bin.length);
     for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    var file = new File([bytes], 'scribblepix.png', { type: 'image/png' });
+    var file = new File([bytes], 'tiny-draw.png', { type: 'image/png' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       navigator.share({ files: [file] }).catch(function() {}); // user closing the sheet rejects — fine
       return;
     }
   }
   var a = document.createElement('a');
-  a.download = 'scribblepix.png';
+  a.download = 'tiny-draw.png';
   a.href = dataUrl;
   a.click();
 }
