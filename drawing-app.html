@@ -124,7 +124,7 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 .app-menu-close img { width: 16px; height: 16px; display: block; }
 
 .app-menu-primary { display: flex; flex-direction: column; gap: 12px; }
-.app-menu-item { display: flex; align-items: center; justify-content: center; gap: 12px; border: none; cursor: pointer; font-family: 'Fredoka', sans-serif; font-weight: 600; padding: 0; transition: filter 0.14s, background 0.14s, transform 0.12s; }
+.app-menu-item { display: flex; align-items: center; justify-content: center; gap: 12px; border: none; cursor: pointer; font-family: 'Fredoka', sans-serif; font-weight: 600; padding: 0; white-space: nowrap; transition: filter 0.14s, background 0.14s, transform 0.12s; }
 .app-menu-item:active { transform: scale(0.97); }
 .app-menu-item img { display: block; }
 .app-menu-item.big { height: 60px; border-radius: 25px; font-size: 18px; }
@@ -134,14 +134,12 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 .app-menu-item.open { background: #E3F1FF; color: #23303C; }
 .app-menu-item.open:hover { filter: brightness(0.97); }
 
-.app-menu-divider { display: block; width: 100%; height: auto; margin: 18px 0 16px; }
+.app-menu-divider { display: block; width: 100%; height: auto; margin: 18px 0 16px; overflow: visible; }
 
-.app-menu-secondary { display: flex; gap: 6px; }
-.app-menu-item.small { height: 40px; border-radius: 20px; font-size: 17px; background: #EEEEEE; color: #23303C; }
+.app-menu-secondary { display: flex; justify-content: space-between; }
+.app-menu-item.small { padding: 10px 16px; border-radius: 20px; font-size: 17px; background: #EEEEEE; color: #23303C; }
 .app-menu-item.small:hover { background: #E6E6E6; }
 .app-menu-item.small img { width: 20px; height: 20px; }
-.app-menu-item.about { flex: 103; }
-.app-menu-item.install { flex: 134; }
 
 /* ── Settings overlay ────────────────────────────────────────────────────── */
 #settings-overlay { position: fixed; inset: 0; z-index: 900; background: rgba(8,8,24,0.42); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
