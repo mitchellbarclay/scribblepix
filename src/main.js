@@ -16,6 +16,7 @@ import { initBrushSlider, onSliderMove, onSliderRelease } from './ui/brush-slide
 import { initToolbar, hideRectSubmenu, hideEllipseSubmenu } from './ui/toolbar.js';
 import { initToolbarOverflow } from './ui/toolbar-overflow.js';
 import { initRiveDock, setRiveDockActive, riveDockStrokeHit, riveDockStrokeEnd } from './ui/rive-dock.js';
+import { initRiveStamp, isPlacedTool, placedDown, placedMove, placedUp, placedCancel } from './tools/rive-stamp.js';
 import { initSettingsMenu } from './ui/settings-menu.js';
 import { initAppMenu, menuBtnStrokeBegin, menuBtnStrokeHit, menuBtnStrokeEnd } from './ui/app-menu.js';
 import { warmupTools } from './tools/prewarm.js';
@@ -60,6 +61,9 @@ state.canvas.addEventListener('mousedown', function(e) {
   // No drawing while a dock effect (fill, dynamite, tornado, alien, undo) is
   // animating — concurrent strokes get eaten by the effect's canvas writes.
   if (state.effectBusy > 0) return;
+  // Placed effect tools (fill, …) are stamp-and-commit, not brush strokes — route
+  // them to the Rive-stamp lifecycle and skip the brush machinery entirely.
+  if (isPlacedTool(state.tool)) { var ip = getPos(e); placedDown(ip[0], ip[1]); return; }
   if (state.tool === 'rect') hideRectSubmenu();
   if (state.tool === 'ellipse') hideEllipseSubmenu();
   menuBtnStrokeBegin();
@@ -91,6 +95,7 @@ state.canvas.addEventListener('mousedown', function(e) {
 });
 
 state.canvas.addEventListener('mousemove', function(e) {
+  if (isPlacedTool(state.tool)) { var mp = getPos(e); placedMove(mp[0], mp[1]); return; }
   if (!state.painting) return;
   var pos = getPos(e);
   drawStroke(pos[0], pos[1], inputTime(e));
@@ -104,6 +109,7 @@ state.canvas.addEventListener('mousemove', function(e) {
 });
 
 state.canvas.addEventListener('mouseup', function() {
+  if (isPlacedTool(state.tool)) { placedUp(); return; }
   state.painting = false;
   finalizeVineStrokeV2(); finalizeFlowerStroke(); finalizeBoltStroke(); finalizeFireStroke();
   finalizeRectStroke(); finalizeEllipseStroke(); finalizePipeStroke(); finalizeThreeStroke();
@@ -112,6 +118,7 @@ state.canvas.addEventListener('mouseup', function() {
 });
 
 state.canvas.addEventListener('mouseleave', function() {
+  if (isPlacedTool(state.tool)) { placedCancel(); return; }
   state.painting = false;
   finalizeVineStrokeV2(); finalizeFlowerStroke(); finalizeBoltStroke(); finalizeFireStroke();
   cancelRectStroke(); cancelEllipseStroke(); finalizePipeStroke(); finalizeThreeStroke();
@@ -123,6 +130,7 @@ state.canvas.addEventListener('mouseleave', function() {
 // touch (system gesture, Pencil edge, notification). Without this, state.pipeStroke
 // (and any other in-flight brush state) stays live and re-commits on the next mouseup.
 state.canvas.addEventListener('touchcancel', function() {
+  if (isPlacedTool(state.tool)) { placedCancel(); return; }
   state.painting = false;
   finalizeVineStrokeV2(); finalizeFlowerStroke(); finalizeBoltStroke(); finalizeFireStroke();
   cancelRectStroke(); cancelEllipseStroke(); finalizePipeStroke(); finalizeThreeStroke();
@@ -183,6 +191,7 @@ initSettingsMenu();
 initAppMenu();
 initRiveDock();
 setRiveDockActive(true);
+initRiveStamp();
 initSplashScreen();
 
 if (window.requestIdleCallback) {
