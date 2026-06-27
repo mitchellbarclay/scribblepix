@@ -37,8 +37,10 @@ var HOLD_MS      = 2200;  // stroke sits fully visible before it starts fading
 var FADE_MS      = 9000;  // uniform fade-out duration
 var GAP_MS       = 120;   // pause after a stroke seals before the next begins
 var LAYER_ALPHA  = 0.85;  // opacity each stroke layer holds before fading
-var MAX_LAYERS   = 10;    // hard cap on concurrent layers (memory guard)
-var CANDIDATES   = 6;     // candidate paths generated per stroke; the emptiest wins
+var MAX_LAYERS   = 5;     // hard cap on concurrent layers (memory guard)
+var CANDIDATES   = 3;     // candidate paths generated per stroke; the emptiest wins
+var FRAME_MS     = 33;    // cap the draw loop to ~30fps (decorative; halves per-frame cost)
+var STEPS_PER_TICK = 2;   // samples advanced per processed tick — keeps ~600 px/s at 30fps
 var OCC_DECAY    = 0.5;   // per-stroke decay of the occupancy map (recent strokes weigh most)
 var GW = 12, GH = 9;      // occupancy-map grid resolution
 
@@ -77,6 +79,7 @@ var mode = 'idle';      // 'drawing' | 'settling' | 'gap'
 var phaseUntil = 0;
 var occ = null;         // recency-weighted occupancy map (Float32Array, GW*GH)
 var resizeTimer = null;
+var lastFrameT = 0;     // timestamp of the last processed (non-skipped) frame
 
 function vw(splash) { return splash.clientWidth; }
 function vh(splash) { return splash.clientHeight; }
@@ -135,7 +138,7 @@ export function startSplashAmbient(splash) {
   state.splashAmbient = true; // suspend the app's resize handlers while borrowed
 
   running = true;
-  mode = 'gap'; phaseUntil = 0; queue = []; cur = null; layers = [];
+  mode = 'gap'; phaseUntil = 0; queue = []; cur = null; layers = []; lastFrameT = 0;
   occ = new Float32Array(GW * GH);
   rafId = requestAnimationFrame(frame);
 
@@ -442,12 +445,20 @@ function beginStroke() {
 // ── Master loop ───────────────────────────────────────────────────────────--
 function frame(now) {
   if (!running) return;
+  rafId = requestAnimationFrame(frame);
+
+  // ~30fps cap: skip the heavy work on in-between frames. The brush draw rate is
+  // kept constant by consuming STEPS_PER_TICK samples on each processed tick.
+  if (now - lastFrameT < FRAME_MS) return;
+  lastFrameT = now;
 
   if (mode === 'drawing' && cur) {
-    var p = cur.samples[cur.idx];
-    drawStroke(p.x, p.y);
-    state.lastX = p.x; state.lastY = p.y;
-    cur.idx++;
+    for (var k = 0; k < STEPS_PER_TICK && cur.idx < cur.samples.length; k++) {
+      var p = cur.samples[cur.idx];
+      drawStroke(p.x, p.y);
+      state.lastX = p.x; state.lastY = p.y;
+      cur.idx++;
+    }
     if (cur.idx >= cur.samples.length) {
       state.painting = false;
       mode = 'settling';
@@ -464,6 +475,4 @@ function frame(now) {
   } else if (mode === 'gap') {
     if (now >= phaseUntil) beginStroke();
   }
-
-  rafId = requestAnimationFrame(frame);
 }

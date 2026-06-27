@@ -14,9 +14,10 @@ var mirrorMesh = null;
 var primaryWire = null;
 var mirrorWire = null;
 
-// Cross-section of the ribbon: a flattened pentagon (low-poly, wider than thick).
-// Listed CCW. Scaled per-ring by halfW (u) and halfT (v).
-var SIDES = 5;
+// Cross-section of the ribbon: a flattened diamond (low-poly, wider than thick).
+// Listed CCW. Scaled per-ring by halfW (u) and halfT (v). Fewer sides + coarser
+// ring spacing (see drawThreeStroke) = chunkier facets, lower poly count.
+var SIDES = 4;
 var CS = [];
 (function () {
   for (var k = 0; k < SIDES; k++) {
@@ -348,7 +349,7 @@ export function drawThreeStroke(x, y, color) {
     var last = state.threeStroke.pts[state.threeStroke.pts.length - 1];
     // Append-only spine with a fixed min spacing → committed segments are frozen.
     // Coarser spacing = fewer rings = lower-poly + cheaper rebuilds.
-    if (Math.hypot(x - last.x, y - last.y) >= 9) {
+    if (Math.hypot(x - last.x, y - last.y) >= 16) {
       state.threeStroke.pts.push({ x: x, y: y });
       state.threeStroke.dirty = true;
     }
