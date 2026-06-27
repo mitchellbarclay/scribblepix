@@ -349,7 +349,7 @@ export function drawThreeStroke(x, y, color) {
     var last = state.threeStroke.pts[state.threeStroke.pts.length - 1];
     // Append-only spine with a fixed min spacing → committed segments are frozen.
     // Coarser spacing = fewer rings = lower-poly + cheaper rebuilds.
-    if (Math.hypot(x - last.x, y - last.y) >= 16) {
+    if (Math.hypot(x - last.x, y - last.y) >= 23) {
       state.threeStroke.pts.push({ x: x, y: y });
       state.threeStroke.dirty = true;
     }
