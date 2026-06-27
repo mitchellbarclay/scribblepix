@@ -63,7 +63,14 @@ body { background: linear-gradient(135deg, var(--bg-c1) 0%, var(--bg-c2) 50%, va
 #color-handle.grabbing, #mod-handle.grabbing { cursor: grabbing; box-shadow: 0 0 0 3px var(--accent), 0 2px 10px rgba(0,0,0,0.32), inset 0 0 0 2px rgba(255,255,255,0.55); }
 #color-handle.anim-press, #mod-handle.anim-press { animation: sliderPressDown 0.28s cubic-bezier(0.36,0.07,0.19,0.97) forwards; }
 #color-handle.anim-release, #mod-handle.anim-release { animation: sliderRelease 0.4s cubic-bezier(0.25,0.46,0.45,0.94) forwards; }
-#canvas-area { flex: 1; background: #ffffff; overflow: hidden; position: relative; min-width: 0; margin: 12px 0; border-radius: 24px; }
+#canvas-column { flex: 1; min-width: 0; display: flex; flex-direction: column; margin: 12px 0; }
+#top-bar { height: 70px; flex-shrink: 0; position: relative; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: var(--rail-bg); border-radius: 24px 24px 0 0; }
+#top-bar-left { display: flex; align-items: center; gap: 6px; height: 100%; }
+.shelf-btn { position: relative; top: auto; left: auto; width: 52px; height: 52px; cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent; }
+/* The top bar and canvas share one continuous rounded silhouette: the bar rounds
+   its top corners, the canvas rounds its bottom corners, and the join is square. */
+#canvas-area { flex: 1; background: #ffffff; overflow: hidden; position: relative; min-width: 0; border-radius: 0 0 24px 24px; }
+#wipe-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 150; }
 #resize-overlay { display: none; position: absolute; inset: 0; background: rgba(220,230,238,0.7); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 100; align-items: center; justify-content: center; flex-direction: column; gap: 18px; color: #1a1a2e; font-family: 'Fredoka', sans-serif; font-size: 20px; letter-spacing: 0.02em; }
 #canvas-area.resizing #resize-overlay { display: flex; }
 #mini-browser { width: 180px; height: 130px; background: #ffffff; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); display: flex; flex-direction: column; overflow: hidden; transition: width 0.18s ease, height 0.18s ease; }
@@ -106,7 +113,7 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 
 /* ── App menu (canvas top-right) ─────────────────────────────────────────── */
 /* Single morphing container — expands from pill to card on open */
-#app-menu { position: absolute; top: 16px; right: 16px; z-index: 401; background: #ffffff; border: 1px solid #DADADA; border-radius: 23.5px; box-shadow: 0 2px 8px rgba(0,0,0,0.10); overflow: hidden; user-select: none; width: 130px; height: 47px; transition: width 0.32s cubic-bezier(0.22,1,0.36,1), height 0.32s cubic-bezier(0.22,1,0.36,1), border-radius 0.28s ease, box-shadow 0.22s ease, transform 0.12s ease, opacity 0.22s ease; }
+#app-menu { position: absolute; top: 11px; right: 14px; z-index: 401; background: #ffffff; border: 1px solid #DADADA; border-radius: 23.5px; box-shadow: 0 2px 8px rgba(0,0,0,0.10); overflow: hidden; user-select: none; width: 130px; height: 47px; transition: width 0.32s cubic-bezier(0.22,1,0.36,1), height 0.32s cubic-bezier(0.22,1,0.36,1), border-radius 0.28s ease, box-shadow 0.22s ease, transform 0.12s ease, opacity 0.22s ease; }
 #app-menu:not(.open):hover { box-shadow: 0 4px 12px rgba(0,0,0,0.14); }
 #app-menu:not(.open):active { transform: scale(0.96); }
 #app-menu.open { border-radius: 24.5px; box-shadow: 0 16px 40px rgba(0,0,0,0.18); cursor: default; transition: width 0.35s cubic-bezier(0.34,1.18,0.64,1), height 0.35s cubic-bezier(0.34,1.18,0.64,1), border-radius 0.3s cubic-bezier(0.34,1.18,0.64,1), box-shadow 0.22s ease, transform 0.12s ease, opacity 0.22s ease; }
@@ -182,9 +189,6 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
 .install-step { background: #f3f3f3; border-radius: 25px; padding: 22px; font-size: 18px; font-weight: 500; color: #23303C; display: flex; align-items: center; gap: 20px; }
 .install-step-icon { width: 20px; height: 20px; flex-shrink: 0; }
 
-/* ── Rive dock ───────────────────────────────────────────────────────────── */
-#rive-dock-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 200; transition: opacity 0.22s ease; }
-#canvas-area.resizing #rive-dock-canvas { display: none; }
 
 /* ── Splash screen ───────────────────────────────────────────────────────── */
 #splash-screen { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; background: #c9effb; transition: opacity 0.38s ease, transform 0.38s ease; transform-origin: center; overflow: hidden; }
@@ -272,11 +276,13 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
   </button>
 </div>
 
-<div id="canvas-area">
-  <canvas id="c"></canvas>
-  <canvas id="overlay"></canvas>
-  <canvas id="rive-dock-canvas"></canvas>
-  <div id="app-menu" aria-label="Menu">
+<div id="canvas-column">
+  <div id="top-bar">
+    <div id="top-bar-left">
+      <canvas id="undo-canvas" class="shelf-btn"></canvas>
+      <canvas id="tornado-canvas" class="shelf-btn"></canvas>
+    </div>
+    <div id="app-menu" aria-label="Menu">
     <button class="app-menu-pill" aria-label="Open menu">
       <span class="app-menu-label">Menu</span>
       <img class="app-menu-btn-icon" src="icons/ui/menu-hamburger-icon.svg" alt="">
@@ -297,6 +303,11 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
       </div>
     </div>
   </div>
+  </div>
+  <div id="canvas-area">
+  <canvas id="c"></canvas>
+  <canvas id="overlay"></canvas>
+  <canvas id="wipe-canvas"></canvas>
   <input id="open-image-input" type="file" accept="image/*" hidden>
   <div id="resize-overlay">
     <div id="mini-browser">
@@ -309,6 +320,7 @@ canvas { position: absolute; top: 0; left: 0; touch-action: none; }
     </div>
     <div>Resizing canvas...</div>
   </div>
+</div>
 </div>
 
 <div id="right-rail">

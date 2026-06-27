@@ -3,8 +3,7 @@ import { saveHistory } from '../core/history.js';
 
 // ── Alien blast: permanent pixel scatter + paint explosion + overlay animation ──
 // Rive handles the UFO animation; this fires the canvas-side impact effect.
-// Lifted verbatim out of rive-dock.js so both the legacy dock and the new
-// rive-stamp placed tool can share it.
+// Called from rive-stamp.js on the alien tool's impact.
 //
 // Animation sequence (all permanent canvas changes are kept; only overlay reverts):
 //   1. Compute warped offscreen canvas in one pass (pixel displacement)

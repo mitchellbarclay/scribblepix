@@ -19,11 +19,14 @@ import { doAlienBlast } from './alien-blast.js';
 //   impact   (listen)— Rive's climax frame → JS runs the real effect here
 //   done     (listen)— animation fully settled → recycle the instance
 //
-// Lifecycle: prewarmed instances sit idle (display:none, paused). On a tap we
+// Lifecycle: prewarmed instances sit idle on a blank frame (display:none) but run
+// with autoplay so their state machines keep advancing — required because, once
+// the old Rive dock (which kept a permanent advance loop alive) was removed, a
+// settled/paused stamp would never advance to consume a fired trigger. On a tap we
 // acquire a free one, position its canvas centred on the tap (anchor = artboard
-// centre = impact zone), play + fire `place`, then `commit` on release. The SM
-// returns to its initial state and fires `done` when complete, so a reused
-// instance needs no manual reset. If all are busy we grow the pool on demand.
+// centre = impact zone), fire `place`, then `commit` on release. The SM returns to
+// its initial state and fires `done` when complete, so a reused instance needs no
+// manual reset. If all are busy we grow the pool on demand.
 
 var ARTBOARD = 360;       // design px — anchor at centre is the impact zone
 var DRAG_THRESH = 6;      // px of movement before a press counts as a drag
@@ -81,7 +84,7 @@ function _createInstance(pool) {
     canvas: canvas,
     artboard: pool.artboard,
     stateMachines: 'State Machine 1',
-    autoplay: false,
+    autoplay: true,
     layout: new window.rive.Layout({ fit: window.rive.Fit.Contain }),
     onLoad: function() {
       // Don't size the surface here — the canvas is display:none (0×0) until first
@@ -111,6 +114,7 @@ function _anyBusy(pool) {
   for (var i = 0; i < pool.instances.length; i++) if (pool.instances[i].busy) return true;
   return false;
 }
+
 
 function _acquire(tool) {
   var pool = _pools[tool];
@@ -147,12 +151,7 @@ export function placedDown(x, y) {
   inst.rive.resizeDrawingSurfaceToCanvas();
   if (inst.cColor) inst.cColor.value = _currentArgb();
   if (inst.bDragging) inst.bDragging.value = false;
-  inst.rive.play();
   _fire(inst.tPlace);
-
-  // The dock relay only forwards mousemove while painting; placed tools reuse the
-  // flag so drag-to-reposition works while the dock is still present.
-  state.painting = true;
 }
 
 export function placedMove(x, y) {
@@ -168,7 +167,6 @@ export function placedMove(x, y) {
 }
 
 export function placedUp() {
-  state.painting = false;
   if (!_active) return;
   var inst = _active;
   _active = null;
@@ -185,7 +183,6 @@ export function placedUp() {
 }
 
 export function placedCancel() {
-  state.painting = false;
   if (!_active) return;
   var inst = _active;
   _active = null;
@@ -205,7 +202,6 @@ function _recycle(inst) {
   inst.busy = false;
   inst.canvas.style.display = 'none';
   if (inst.bDragging) inst.bDragging.value = false;
-  try { inst.rive.pause(); } catch (e) {}
 }
 
 function _fire(t) {
@@ -224,8 +220,8 @@ function _currentArgb() {
 }
 
 // ── Fill impact ───────────────────────────────────────────────────────────────
-// Mirrors _doFill from rive-dock.js: flood fill at the impact point, reusing the
-// snapshot saveHistory() just took so the fill doesn't do a second GPU readback.
+// Flood fill at the impact point, reusing the snapshot saveHistory() just took so
+// the fill doesn't do a second GPU readback.
 var _fillBusy = false;
 function fillImpact(x, y) {
   if (_fillBusy) return;

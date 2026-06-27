@@ -15,8 +15,8 @@ import { initColorPicker, onColorMove, onColorRelease } from './ui/color-picker.
 import { initBrushSlider, onSliderMove, onSliderRelease } from './ui/brush-slider.js';
 import { initToolbar, hideRectSubmenu, hideEllipseSubmenu } from './ui/toolbar.js';
 import { initToolbarOverflow } from './ui/toolbar-overflow.js';
-import { initRiveDock, setRiveDockActive, riveDockStrokeHit, riveDockStrokeEnd } from './ui/rive-dock.js';
 import { initRiveStamp, isPlacedTool, placedDown, placedMove, placedUp, placedCancel } from './tools/rive-stamp.js';
+import { initRiveShelf } from './ui/rive-shelf.js';
 import { initSettingsMenu } from './ui/settings-menu.js';
 import { initAppMenu, menuBtnStrokeBegin, menuBtnStrokeHit, menuBtnStrokeEnd } from './ui/app-menu.js';
 import { warmupTools } from './tools/prewarm.js';
@@ -104,7 +104,6 @@ state.canvas.addEventListener('mousemove', function(e) {
     if (state.mirrorMode) state.lastStrokePoints.push({x: state.canvasW-pos[0], y: pos[1]});
   }
   state.lastX = pos[0]; state.lastY = pos[1];
-  riveDockStrokeHit(e.clientX, e.clientY);
   menuBtnStrokeHit(e.clientX, e.clientY);
 });
 
@@ -114,7 +113,7 @@ state.canvas.addEventListener('mouseup', function() {
   finalizeVineStrokeV2(); finalizeFlowerStroke(); finalizeBoltStroke(); finalizeFireStroke();
   finalizeRectStroke(); finalizeEllipseStroke(); finalizePipeStroke(); finalizeThreeStroke();
   clearBrushPreview();
-  riveDockStrokeEnd(); menuBtnStrokeEnd();
+  menuBtnStrokeEnd();
 });
 
 state.canvas.addEventListener('mouseleave', function() {
@@ -123,7 +122,7 @@ state.canvas.addEventListener('mouseleave', function() {
   finalizeVineStrokeV2(); finalizeFlowerStroke(); finalizeBoltStroke(); finalizeFireStroke();
   cancelRectStroke(); cancelEllipseStroke(); finalizePipeStroke(); finalizeThreeStroke();
   clearBrushPreview();
-  riveDockStrokeEnd(); menuBtnStrokeEnd();
+  menuBtnStrokeEnd();
 });
 
 // On iOS/iPadOS, touchcancel fires instead of touchend when the OS interrupts the
@@ -135,7 +134,7 @@ state.canvas.addEventListener('touchcancel', function() {
   finalizeVineStrokeV2(); finalizeFlowerStroke(); finalizeBoltStroke(); finalizeFireStroke();
   cancelRectStroke(); cancelEllipseStroke(); finalizePipeStroke(); finalizeThreeStroke();
   clearBrushPreview();
-  riveDockStrokeEnd(); menuBtnStrokeEnd();
+  menuBtnStrokeEnd();
 });
 
 // Touch → mouse passthrough
@@ -167,7 +166,7 @@ window.addEventListener('mouseup', function() {
   finalizePipeStroke();
   onSliderRelease();
   onColorRelease();
-  riveDockStrokeEnd(); menuBtnStrokeEnd();
+  menuBtnStrokeEnd();
 });
 window.addEventListener('touchmove', function(e) {
   if (!e.touches.length) return;
@@ -189,9 +188,8 @@ initToolbar();
 initToolbarOverflow();
 initSettingsMenu();
 initAppMenu();
-initRiveDock();
-setRiveDockActive(true);
 initRiveStamp();
+initRiveShelf();
 initSplashScreen();
 
 if (window.requestIdleCallback) {
