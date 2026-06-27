@@ -147,7 +147,7 @@ function rotateAround(v, axis, angle) {
 // Geometry is built one ring per point (no global resample) so already-laid
 // segments never shift as new points arrive.
 function buildRibbonMesh(pts, material, brushSize) {
-  var radius = Math.max(2.2, brushSize * 0.40);
+  var radius = Math.max(3.2, brushSize * 0.56);
   var halfW = radius * 1.25;   // ribbon is wider...
   var halfT = radius * 0.46;   // ...than it is thick
   var zAmp = radius * 3.1;
