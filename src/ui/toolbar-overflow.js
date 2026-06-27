@@ -59,14 +59,14 @@ function goToK(nk, animate = true) {
 // Size the viewport to a whole number of tool slots based on available height.
 function relayout() {
   total = tools().length;
-  // Allocate 65% of the total rail interior to the tool section (pin + gaps +
-  // viewport); the slider (flex: 1 1 auto) claims the remaining ≥35%.
+  // Allocate 72% of the total rail interior to the tool section (pin + gaps +
+  // viewport); the slider (flex: 1 1 auto) claims the remaining ≥28%.
   // Subtracting the always-shown pin and the two inter-element gaps from the
-  // 65% bucket gives the pixel budget for the scroll viewport itself.
+  // 72% bucket gives the pixel budget for the scroll viewport itself.
   //   left-rail column: [pin][gap][viewport] (tool-pill) [gap] [brush]
   const railInner = leftRail.clientHeight - RAIL_PAD * 2;
   const pinH = pinEl.offsetHeight || 70;
-  const toolBudget = railInner * 0.65 - pinH - 2 * RAIL_GAP;
+  const toolBudget = railInner * 0.72 - pinH - 2 * RAIL_GAP;
   // N buttons need N*BTN + (N-1)*GAP = N*PITCH - GAP px (plus the viewport's 2*PAD).
   let N = Math.floor((toolBudget - 2 * PAD + GAP) / PITCH);
   visibleN = clamp(N, 1, total);
