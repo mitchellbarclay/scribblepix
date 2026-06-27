@@ -21,6 +21,7 @@ let total = 0;      // total tool count
 // past the ends while dragging.
 const SETTLE = 'transform 0.34s cubic-bezier(0.34,1.56,0.64,1)';
 const RUBBER = 0.35;
+const DRAG_SPEED = 1.8;     // scroll faster than the finger moves (1 = 1:1)
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
@@ -48,6 +49,10 @@ function updateSlots() {
   if (canDown && btns[k + visibleN - 1]) btns[k + visibleN - 1].classList.add('slot-hidden');
   updateActiveToolPin();
 }
+
+// Number of tools an arrow press jumps — a near-full window so a tap pages
+// through the list instead of nudging one tool at a time.
+function arrowStep() { return Math.max(2, visibleN - 1); }
 
 // Snap to a whole-tool index, elastically settling unless told otherwise.
 function goToK(nk, animate = true) {
@@ -101,8 +106,8 @@ export function initToolbarOverflow() {
   toolPill = document.getElementById('tool-pill');
   leftRail = document.getElementById('left-rail');
 
-  upBtn.addEventListener('click', () => goToK(k - 1));
-  downBtn.addEventListener('click', () => goToK(k + 1));
+  upBtn.addEventListener('click', () => goToK(k - arrowStep()));
+  downBtn.addEventListener('click', () => goToK(k + arrowStep()));
 
   pinEl.addEventListener('click', () => {
     const activeBtn = document.querySelector('.tool-btn.active');
@@ -126,10 +131,12 @@ export function initToolbarOverflow() {
   });
 
   function onMove(e) {
-    const delta = dragStartY - e.clientY;
-    if (!isDrag && Math.abs(delta) > 6) isDrag = true;
+    const rawDelta = dragStartY - e.clientY;
+    // Detect a drag on raw finger movement, but scroll at DRAG_SPEED× so the
+    // list travels faster than the finger and reaches distant tools sooner.
+    if (!isDrag && Math.abs(rawDelta) > 6) isDrag = true;
     if (!isDrag) return;
-    const raw = dragStartOffset + delta;
+    const raw = dragStartOffset + rawDelta * DRAG_SPEED;
     const max = maxOffset();
     // Follow the finger 1:1 in range; past the ends apply rubber-band resistance.
     let o = raw;
