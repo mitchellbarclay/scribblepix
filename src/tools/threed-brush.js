@@ -36,17 +36,26 @@ function ensureRenderer() {
 
   scene = new THREE.Scene();
 
-  // Cheap matte lighting: ambient floor + one directional key. Flat-shaded
-  // facets do the heavy lifting for the 3D read, so no specular/rim needed.
-  // A colored emissive/ambient floor keeps the body saturated (so shaded facets
-  // stay rich, not dusty-grey), while a generous directional + specular let
-  // light-facing facets brighten PAST the base colour into bright/white
-  // highlights — that overshoot is the shine that reads as 3D, not a defect.
-  scene.add(new THREE.AmbientLight(0xffffff, 0.22));
+  // Three-point-ish rig tuned for a glossy candy read. A hemisphere fill
+  // (bright warm sky / cool floor) wraps the whole ribbon so facets that face
+  // away from the key still catch coloured light instead of dying to flat grey
+  // — that's what kept the old single-key version looking drab. The key sun is
+  // punchy enough to drive light-facing facets PAST the base colour into bright
+  // highlights, and a dim cool rim from the opposite side carves the shadow
+  // edges so the form stays legible. The material's emissive floor keeps the
+  // body saturated on top of this.
+  scene.add(new THREE.HemisphereLight(0xfff4e6, 0x3a4a6a, 0.55));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.12));
 
-  var sun = new THREE.DirectionalLight(0xffffff, 0.95);
+  var sun = new THREE.DirectionalLight(0xffffff, 1.25);
   sun.position.set(-0.45, 0.8, 0.9).normalize();
   scene.add(sun);
+
+  // Cool rim/fill from the opposite side — lifts the shadow facets just enough
+  // to keep them colourful and reads as a second glint without flattening.
+  var rim = new THREE.DirectionalLight(0xbcd4ff, 0.45);
+  rim.position.set(0.7, -0.25, 0.55).normalize();
+  scene.add(rim);
 }
 
 function ensureCamera() {
@@ -74,15 +83,22 @@ function ensureCamera() {
 // that brightens past the base colour — the shine that reads as 3D.
 export function makeMaterial(color) {
   var col = new THREE.Color(color);
-  // Punch up saturation a touch so the body stays candy-bright.
+  // Punch saturation hard and lift very-dark picks off the floor so the body
+  // stays candy-bright instead of dim — a near-black pick still reads as a
+  // glossy coloured tube rather than a muddy lump.
   var hsl = { h: 0, s: 0, l: 0 };
   col.getHSL(hsl);
-  col.setHSL(hsl.h, Math.min(1, hsl.s * 1.2), hsl.l);
+  var s = Math.min(1, hsl.s * 1.45 + 0.06);
+  var l = Math.min(0.66, Math.max(hsl.l, 0.42));
+  col.setHSL(hsl.h, s, l);
   return new THREE.MeshPhongMaterial({
     color: col,
-    emissive: col.clone().multiplyScalar(0.24),
-    specular: new THREE.Color(0.55, 0.55, 0.55),
-    shininess: 50,
+    // Richer emissive floor keeps shaded facets saturated; tinted toward the
+    // base hue (not grey) so the whole body glows in its own colour.
+    emissive: col.clone().multiplyScalar(0.30),
+    // Brighter, tighter highlight → wet/glossy plastic glint.
+    specular: new THREE.Color(0.78, 0.78, 0.78),
+    shininess: 72,
     side: THREE.FrontSide,
     flatShading: true,
   });
