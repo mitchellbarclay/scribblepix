@@ -6,5 +6,5 @@
 <rect x="45" y="23" width="12" height="12" fill="#AC70FF"/>
 <rect x="21" y="47" width="12" height="12" fill="#AC70FF"/>
 <rect x="19" y="21" width="40" height="40" rx="8" stroke="white" stroke-width="6"/>
-<rect x="20.5" y="22.5" width="37" height="37" rx="6.5" stroke="black" stroke-width="3"/>
+<rect x="20.5" y="22.5" width="37" height="37" rx="6.5" stroke="#23303C" stroke-width="3"/>
 </svg>

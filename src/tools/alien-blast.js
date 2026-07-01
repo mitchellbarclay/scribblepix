@@ -1,5 +1,6 @@
 import state from '../state.js';
 import { saveHistory } from '../core/history.js';
+import { parseColorRgb, rgbToHsl, hslToRgbCss } from '../core/color-utils.js';
 
 // ── Alien blast: permanent pixel scatter + paint explosion + overlay animation ──
 // Rive handles the UFO animation; this fires the canvas-side impact effect.
@@ -13,23 +14,35 @@ import { saveHistory } from '../core/history.js';
 //   5. Crater burns in once the front clears the epicentre
 //   6. Overlay (flash + rings + debris sparks) animates on ovCtx and fades
 
-var _ALIEN_SCHEMES = [
-  ['#ff4daa', '#c44dff'],
-  ['#4dffb4', '#4db8ff'],
-  ['#ffe04d', '#ff8c4d'],
-  ['#4dff91', '#00d4ff'],
-  ['#ff4d6e', '#ff9b4d'],
-];
-
 var WARP_R = 250; // CSS px radius of the permanent pixel warp
+
+// Alien is a placed tool in the standard flow now, so its two-tone scheme and
+// hue-driven accents (rings/streaks/crater) follow the selected colour instead
+// of picking a fixed palette at random.
+function alienSchemeFromColor() {
+  if (state.rainbowMode) {
+    var rh = Math.random() * 360;
+    return { hue: rh, c0: hslToRgbCss(rh, 0.9, 0.62), c1: hslToRgbCss((rh + 45) % 360, 0.9, 0.62) };
+  }
+  var rgb = parseColorRgb(state.color);
+  var hsl = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+  var s = Math.max(0.65, hsl[1]);
+  var l = Math.max(0.45, Math.min(0.75, hsl[2]));
+  return {
+    hue: hsl[0],
+    c0: hslToRgbCss(hsl[0], s, l),
+    c1: hslToRgbCss((hsl[0] + 45) % 360, s, Math.min(0.8, l + 0.1))
+  };
+}
 
 export function doAlienBlast(dropX, dropY) {
   saveHistory();
   state.effectBusy++;
   state.lastStrokePoints = null;
 
-  var scheme   = _ALIEN_SCHEMES[Math.floor(Math.random() * _ALIEN_SCHEMES.length)];
-  var blastHue = Math.floor(Math.random() * 360);
+  var alienC   = alienSchemeFromColor();
+  var scheme   = [alienC.c0, alienC.c1];
+  var blastHue = Math.round(alienC.hue);
   var baseR    = Math.max(32, Math.min(state.canvasW, state.canvasH) * 0.09);
 
   // N-fold symmetry: prime numbers 5/6/7 feel alien, not natural or mechanical

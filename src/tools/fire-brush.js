@@ -29,32 +29,39 @@ var FLAME_VARIANTS = [
   {pa:0.46,pb:1.40,wMul:0.92,hMul:1.25,asym: 0.13,curl:0.15,cFreq:1.2,cPhase:3.8,wob1:0.05,wob2:0.02,lPhase:2.0, rPhase:4.7},
 ];
 
-function fireBaseHue() {
-  if (state.rainbowMode) return state.rainbowHue;
+// Lightness delta (percentage points) is derived from how far the picked colour
+// sits from the rainbow slider's neutral middle lightness, so the light/dark
+// modifier slider actually shows up in the flame instead of always rendering
+// the same fixed fire-glow lightness ramp.
+function fireBaseColor() {
+  if (state.rainbowMode) return {hue: state.rainbowHue, lDelta: 0};
   var rgb = hexToRgb(state.color);
   var hsl = rgbToHsl(rgb[0], rgb[1], rgb[2]);
-  if (hsl[1] < 0.15) return 12;
-  return hsl[0];
+  var hue = hsl[1] < 0.15 ? 12 : hsl[0];
+  var lDelta = (hsl[2] - 0.5) * 100;
+  return {hue: hue, lDelta: lDelta};
 }
 
-// Flame gradients depend only on hue + height, both constant per stamp, so they
-// are built once at placement and reused every frame. Coordinates are local
-// (post translate/rotate); CanvasGradients are not bound to a context, so a
+function clampL(l) { return Math.max(0, Math.min(100, l)); }
+
+// Flame gradients depend only on hue/lightness + height, all constant per stamp,
+// so they are built once at placement and reused every frame. Coordinates are
+// local (post translate/rotate); CanvasGradients are not bound to a context, so a
 // gradient created from state.ctx paints correctly on the overlay too.
-function makeFlameGradients(hue, H) {
+function makeFlameGradients(hue, lDelta, H) {
   var grad = state.ctx.createLinearGradient(0,0,0,-H);
-  grad.addColorStop(0.00,'hsla('+hue+',95%,22%,0)');
-  grad.addColorStop(0.05,'hsla('+hue+',95%,32%,0.55)');
-  grad.addColorStop(0.25,'hsla('+(hue+4)+',98%,44%,0.72)');
-  grad.addColorStop(0.55,'hsla('+(hue+12)+',98%,54%,0.80)');
-  grad.addColorStop(0.80,'hsla('+(hue+24)+',98%,66%,0.85)');
-  grad.addColorStop(0.94,'hsla('+(hue+36)+',98%,80%,0.90)');
+  grad.addColorStop(0.00,'hsla('+hue+',95%,'+clampL(22+lDelta)+'%,0)');
+  grad.addColorStop(0.05,'hsla('+hue+',95%,'+clampL(32+lDelta)+'%,0.55)');
+  grad.addColorStop(0.25,'hsla('+(hue+4)+',98%,'+clampL(44+lDelta)+'%,0.72)');
+  grad.addColorStop(0.55,'hsla('+(hue+12)+',98%,'+clampL(54+lDelta)+'%,0.80)');
+  grad.addColorStop(0.80,'hsla('+(hue+24)+',98%,'+clampL(66+lDelta)+'%,0.85)');
+  grad.addColorStop(0.94,'hsla('+(hue+36)+',98%,'+clampL(80+lDelta)+'%,0.90)');
   grad.addColorStop(1.00,'rgba(255,255,245,0.95)');
   var core = state.ctx.createLinearGradient(0,0,0,-H*0.88);
-  core.addColorStop(0.00,'hsla('+(hue+8)+',98%,62%,0.70)');
-  core.addColorStop(0.20,'hsla('+(hue+14)+',98%,72%,0.80)');
-  core.addColorStop(0.55,'hsla('+(hue+26)+',98%,84%,0.90)');
-  core.addColorStop(0.85,'hsla('+(hue+40)+',95%,93%,0.95)');
+  core.addColorStop(0.00,'hsla('+(hue+8)+',98%,'+clampL(62+lDelta)+'%,0.70)');
+  core.addColorStop(0.20,'hsla('+(hue+14)+',98%,'+clampL(72+lDelta)+'%,0.80)');
+  core.addColorStop(0.55,'hsla('+(hue+26)+',98%,'+clampL(84+lDelta)+'%,0.90)');
+  core.addColorStop(0.85,'hsla('+(hue+40)+',95%,'+clampL(93+lDelta)+'%,0.95)');
   core.addColorStop(1.00,'rgba(255,255,252,1.00)');
   return {grad:grad, core:core};
 }
@@ -165,7 +172,8 @@ export function commitFireStrokeNow() {
 function placeFlameStamp(x, y) {
   var height = state.brushSize*(1.5+Math.random()*0.8);
   var variant = Math.floor(Math.random()*FLAME_VARIANTS.length);
-  var hue = fireBaseHue();
+  var baseColor = fireBaseColor();
+  var hue = baseColor.hue, lDelta = baseColor.lDelta;
   if (state.rainbowMode) state.rainbowHue = (state.rainbowHue+4)%360;
 
   var speed = Math.hypot(state.fireVelX, state.fireVelY);
@@ -194,7 +202,7 @@ function placeFlameStamp(x, y) {
     lLean[pi] = v.asym*Math.sin(pu*Math.PI)*lBaseHW*1.2;
     lSqU[pi]  = Math.sqrt(pu);
   }
-  var grads = makeFlameGradients(hue, lH);
+  var grads = makeFlameGradients(hue, lDelta, lH);
   var stampData = {
     x:x+jx, y:y+jy, rot:rot,
     variant:variant, height:height, hue:hue,
